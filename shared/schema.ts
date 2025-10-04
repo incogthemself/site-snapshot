@@ -7,9 +7,13 @@ export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   url: text("url").notNull(),
   name: text("name").notNull(),
-  status: text("status").notNull().default("pending"), // pending, processing, complete, error
+  status: text("status").notNull().default("pending"), // pending, processing, complete, error, paused
   totalFiles: integer("total_files").default(0),
   totalSize: integer("total_size").default(0), // in bytes
+  currentStep: text("current_step"),
+  progressPercentage: integer("progress_percentage").default(0),
+  filesProcessed: integer("files_processed").default(0),
+  isPaused: integer("is_paused").default(0), // 0 = false, 1 = true
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
   errorMessage: text("error_message"),
