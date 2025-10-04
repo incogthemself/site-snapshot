@@ -46,7 +46,7 @@ export class CloneService {
         try {
           const absoluteUrl = new URL(href, url).href;
           const content = await this.fetchResource(absoluteUrl);
-          const localPath = fileManager.getLocalPath(href, baseUrl);
+          const localPath = fileManager.getLocalPath(href, url);
 
           await fileManager.saveFile(projectId, `css/${localPath}`, content);
           await storage.createFile({
@@ -85,7 +85,7 @@ export class CloneService {
         try {
           const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
-          const localPath = fileManager.getLocalPath(src, baseUrl);
+          const localPath = fileManager.getLocalPath(src, url);
 
           await fileManager.saveFile(projectId, `js/${localPath}`, content);
           await storage.createFile({
@@ -124,7 +124,7 @@ export class CloneService {
         try {
           const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
-          const localPath = fileManager.getLocalPath(src, baseUrl);
+          const localPath = fileManager.getLocalPath(src, url);
 
           await fileManager.saveFile(projectId, `images/${localPath}`, content);
           await storage.createFile({
