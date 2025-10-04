@@ -16,11 +16,26 @@ export class CloneService {
   ): Promise<void> {
     try {
       onProgress?.(5, "Launching headless browser");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Launching headless browser",
+        progressPercentage: 5,
+      });
+
+      // Check if paused
+      const project = await storage.getProject(projectId);
+      if (project?.isPaused === 1) {
+        await storage.updateProjectStatus(projectId, "paused");
+        return;
+      }
 
       // Render page with Playwright
       const { html, resources } = await playwrightService.renderPage(url);
 
       onProgress?.(20, "Rendering JavaScript content");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Rendering JavaScript content",
+        progressPercentage: 20,
+      });
 
       // Parse HTML with Cheerio
       const $ = cheerio.load(html);
@@ -42,7 +57,19 @@ export class CloneService {
       });
 
       onProgress?.(30, "Downloading CSS files");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Downloading CSS files",
+        progressPercentage: 30,
+      });
+      
       for (const href of Array.from(cssLinks)) {
+        // Check if paused before each file
+        const project = await storage.getProject(projectId);
+        if (project?.isPaused === 1) {
+          await storage.updateProjectStatus(projectId, "paused");
+          return;
+        }
+
         try {
           const absoluteUrl = new URL(href, url).href;
           const content = await this.fetchResource(absoluteUrl);
@@ -61,11 +88,13 @@ export class CloneService {
           $(`link[href="${href}"]`).attr("href", `./css/${localPath}`);
 
           downloadedCount++;
-          onProgress?.(
-            30 + (downloadedCount / totalResources) * 20,
-            "Downloading CSS files",
-            localPath
-          );
+          const progressPercentage = Math.floor(30 + (downloadedCount / totalResources) * 20);
+          onProgress?.(progressPercentage, "Downloading CSS files", localPath);
+          await storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Downloading CSS files",
+            progressPercentage,
+            filesProcessed: downloadedCount,
+          });
         } catch (error) {
           console.error(`Failed to download CSS: ${href}`, error);
         }
@@ -81,7 +110,19 @@ export class CloneService {
       });
 
       onProgress?.(50, "Downloading JavaScript files");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Downloading JavaScript files",
+        progressPercentage: 50,
+      });
+
       for (const src of Array.from(jsScripts)) {
+        // Check if paused before each file
+        const project = await storage.getProject(projectId);
+        if (project?.isPaused === 1) {
+          await storage.updateProjectStatus(projectId, "paused");
+          return;
+        }
+
         try {
           const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
@@ -100,11 +141,13 @@ export class CloneService {
           $(`script[src="${src}"]`).attr("src", `./js/${localPath}`);
 
           downloadedCount++;
-          onProgress?.(
-            50 + (downloadedCount / totalResources) * 20,
-            "Downloading JavaScript files",
-            localPath
-          );
+          const progressPercentage = Math.floor(50 + (downloadedCount / totalResources) * 20);
+          onProgress?.(progressPercentage, "Downloading JavaScript files", localPath);
+          await storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Downloading JavaScript files",
+            progressPercentage,
+            filesProcessed: downloadedCount,
+          });
         } catch (error) {
           console.error(`Failed to download JS: ${src}`, error);
         }
@@ -120,7 +163,19 @@ export class CloneService {
       });
 
       onProgress?.(70, "Downloading images");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Downloading images",
+        progressPercentage: 70,
+      });
+
       for (const src of Array.from(images)) {
+        // Check if paused before each file
+        const project = await storage.getProject(projectId);
+        if (project?.isPaused === 1) {
+          await storage.updateProjectStatus(projectId, "paused");
+          return;
+        }
+
         try {
           const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
@@ -139,11 +194,13 @@ export class CloneService {
           $(`img[src="${src}"]`).attr("src", `./images/${localPath}`);
 
           downloadedCount++;
-          onProgress?.(
-            70 + (downloadedCount / totalResources) * 15,
-            "Downloading images",
-            localPath
-          );
+          const progressPercentage = Math.floor(70 + (downloadedCount / totalResources) * 15);
+          onProgress?.(progressPercentage, "Downloading images", localPath);
+          await storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Downloading images",
+            progressPercentage,
+            filesProcessed: downloadedCount,
+          });
         } catch (error) {
           console.error(`Failed to download image: ${src}`, error);
         }
@@ -151,6 +208,10 @@ export class CloneService {
 
       // Rewrite all absolute URLs to relative
       onProgress?.(90, "Rewriting URLs");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Rewriting URLs",
+        progressPercentage: 90,
+      });
       const updatedHtml = $.html();
 
       // Save main HTML file
@@ -170,6 +231,8 @@ export class CloneService {
       await storage.updateProjectStatus(projectId, "complete", {
         totalFiles: allFiles.length,
         totalSize,
+        currentStep: "Clone complete",
+        progressPercentage: 100,
       });
 
       onProgress?.(100, "Clone complete");
