@@ -8,7 +8,8 @@ import CodeEditor from "@/components/CodeEditor";
 import LivePreview from "@/components/LivePreview";
 import ProgressModal from "@/components/ProgressModal";
 import SuccessModal from "@/components/SuccessModal";
-import { Globe, Download, Settings, HelpCircle } from "lucide-react";
+import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -99,22 +100,30 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
       {/* Top Navigation Bar */}
-      <header className="bg-card border-b border-border px-4 py-3 flex items-center justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="bg-card border-b border-border px-2 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 flex-shrink-0">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="flex items-center gap-2">
             <i className="fas fa-code text-primary text-xl"></i>
-            <h1 className="text-lg font-bold text-foreground">WebClone Studio</h1>
+            <h1 className="text-base sm:text-lg font-bold text-foreground">WebClone Studio</h1>
+          </div>
+          <div className="flex items-center gap-2 ml-auto sm:hidden">
+            <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Settings">
+              <Settings className="text-muted-foreground w-5 h-5" />
+            </button>
+            <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Help">
+              <HelpCircle className="text-muted-foreground w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* URL Input Section */}
-        <div className="flex-1 max-w-3xl flex items-center gap-2">
+        <div className="flex-1 w-full sm:max-w-3xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex-1 relative">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <input
               type="url"
-              placeholder="Enter website URL to clone (e.g., https://example.com)"
-              className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              placeholder="Enter URL (e.g., https://example.com/page)"
+              className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleClone()}
@@ -122,7 +131,7 @@ export default function Home() {
             />
           </div>
           <button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 sm:px-6 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
             onClick={handleClone}
             disabled={createProjectMutation.isPending}
             data-testid="button-clone"
@@ -132,7 +141,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Settings">
             <Settings className="text-muted-foreground w-5 h-5" />
           </button>
@@ -143,7 +152,42 @@ export default function Home() {
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Mobile: Tabs Layout */}
+      <div className="flex-1 flex lg:hidden overflow-hidden">
+        <Tabs defaultValue="files" className="flex-1 flex flex-col">
+          <TabsList className="grid w-full grid-cols-3 bg-card border-b border-border rounded-none h-12">
+            <TabsTrigger value="files" className="flex items-center gap-2 data-[state=active]:bg-muted">
+              <FileCode className="w-4 h-4" />
+              <span className="hidden sm:inline">Files</span>
+            </TabsTrigger>
+            <TabsTrigger value="editor" className="flex items-center gap-2 data-[state=active]:bg-muted">
+              <Code className="w-4 h-4" />
+              <span className="hidden sm:inline">Editor</span>
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center gap-2 data-[state=active]:bg-muted">
+              <Monitor className="w-4 h-4" />
+              <span className="hidden sm:inline">Preview</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="files" className="flex-1 overflow-hidden mt-0">
+            <FileExplorer
+              files={files}
+              currentProject={currentProject}
+              onFileSelect={setSelectedFile}
+              onProjectSelect={setCurrentProject}
+            />
+          </TabsContent>
+          <TabsContent value="editor" className="flex-1 overflow-hidden mt-0">
+            <CodeEditor file={selectedFile} projectId={currentProject?.id} />
+          </TabsContent>
+          <TabsContent value="preview" className="flex-1 overflow-hidden mt-0">
+            <LivePreview projectId={currentProject?.id} file={selectedFile} />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Desktop: Side-by-Side Layout */}
+      <div className="flex-1 hidden lg:flex overflow-hidden">
         <FileExplorer
           files={files}
           currentProject={currentProject}
@@ -161,22 +205,22 @@ export default function Home() {
       </div>
 
       {/* Bottom Status Bar */}
-      <footer className="bg-card border-t border-border px-4 py-2 flex items-center justify-between text-xs flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+      <footer className="bg-card border-t border-border px-2 sm:px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 text-xs flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto overflow-hidden">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
             <span className="text-muted-foreground">
               {currentProject?.status === "complete" ? "Ready" : currentProject?.status || "Idle"}
             </span>
           </div>
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground truncate">
             {currentProject
               ? `Project: ${currentProject.name}`
               : "Waiting for URL input..."}
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <span className="text-muted-foreground" data-testid="text-file-count">
             Files: {currentProject?.totalFiles || 0}
           </span>

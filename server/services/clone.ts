@@ -44,7 +44,7 @@ export class CloneService {
       onProgress?.(30, "Downloading CSS files");
       for (const href of Array.from(cssLinks)) {
         try {
-          const absoluteUrl = new URL(href, baseUrl).href;
+          const absoluteUrl = new URL(href, url).href;
           const content = await this.fetchResource(absoluteUrl);
           const localPath = fileManager.getLocalPath(href, baseUrl);
 
@@ -83,7 +83,7 @@ export class CloneService {
       onProgress?.(50, "Downloading JavaScript files");
       for (const src of Array.from(jsScripts)) {
         try {
-          const absoluteUrl = new URL(src, baseUrl).href;
+          const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
           const localPath = fileManager.getLocalPath(src, baseUrl);
 
@@ -122,7 +122,7 @@ export class CloneService {
       onProgress?.(70, "Downloading images");
       for (const src of Array.from(images)) {
         try {
-          const absoluteUrl = new URL(src, baseUrl).href;
+          const absoluteUrl = new URL(src, url).href;
           const content = await this.fetchResource(absoluteUrl);
           const localPath = fileManager.getLocalPath(src, baseUrl);
 
