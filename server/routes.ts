@@ -173,5 +173,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pause project cloning
+  app.post("/api/projects/:id/pause", async (req, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      await storage.updateProjectStatus(req.params.id, "paused", {
+        isPaused: 1,
+      });
+
+      const updatedProject = await storage.getProject(req.params.id);
+      res.json(updatedProject);
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to pause project",
+      });
+    }
+  });
+
+  // Resume project cloning
+  app.post("/api/projects/:id/resume", async (req, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      await storage.updateProjectStatus(req.params.id, "processing", {
+        isPaused: 0,
+      });
+
+      // Resume cloning from where it left off
+      cloneService
+        .cloneWebsite(
+          project.id,
+          project.url,
+          (progress, step, currentFile) => {
+            broadcastProgress(project.id, {
+              progress,
+              step,
+              currentFile,
+            });
+          }
+        )
+        .catch((error) => {
+          console.error("Clone error:", error);
+        });
+
+      const updatedProject = await storage.getProject(req.params.id);
+      res.json(updatedProject);
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to resume project",
+      });
+    }
+  });
+
   return httpServer;
 }
