@@ -50,6 +50,64 @@ export default function Home() {
     queryKey: ["/api/projects"],
   });
 
+  // Check for ongoing projects on load and restore progress display
+  useEffect(() => {
+    if (projects.length > 0) {
+      const ongoingProject = projects.find(
+        (p) => p.status === "processing" || p.status === "paused"
+      );
+      if (ongoingProject) {
+        setCurrentProject(ongoingProject);
+        setShowProgress(true);
+        setProgress({
+          progress: ongoingProject.progressPercentage || 0,
+          step: ongoingProject.currentStep || "",
+          currentFile: "",
+        });
+      }
+    }
+  }, [projects]);
+
+  // Poll for project status when there's an ongoing project
+  useEffect(() => {
+    if (!currentProject || (currentProject.status !== "processing" && currentProject.status !== "paused")) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", currentProject.id] });
+      
+      const response = await fetch(`/api/projects/${currentProject.id}`);
+      const updatedProject = await response.json();
+      
+      // Update the current project reference with the latest status
+      setCurrentProject(updatedProject);
+      
+      if (updatedProject.status === "complete") {
+        setShowProgress(false);
+        setShowSuccess(true);
+        clearInterval(interval);
+      } else if (updatedProject.status === "error") {
+        setShowProgress(false);
+        toast({
+          title: "Cloning Failed",
+          description: updatedProject.errorMessage || "Unknown error occurred",
+          variant: "destructive",
+        });
+        clearInterval(interval);
+      } else {
+        setProgress({
+          progress: updatedProject.progressPercentage || 0,
+          step: updatedProject.currentStep || "",
+          currentFile: "",
+        });
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [currentProject, toast]);
+
   const { data: files = [] } = useQuery<ProjectFile[]>({
     queryKey: ["/api/projects", currentProject?.id, "files"],
     enabled: !!currentProject,
@@ -233,6 +291,8 @@ export default function Home() {
       <ProgressModal
         isOpen={showProgress}
         progress={progress}
+        projectId={currentProject?.id}
+        projectStatus={currentProject?.status}
         onClose={() => setShowProgress(false)}
       />
 

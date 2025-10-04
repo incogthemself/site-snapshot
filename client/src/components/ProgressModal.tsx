@@ -1,4 +1,6 @@
-import { X, CheckCircle, Loader2, Circle } from "lucide-react";
+import { X, CheckCircle, Loader2, Circle, Pause, Play } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface ProgressModalProps {
   isOpen: boolean;
@@ -7,6 +9,8 @@ interface ProgressModalProps {
     step: string;
     currentFile?: string;
   };
+  projectId?: string;
+  projectStatus?: string;
   onClose: () => void;
 }
 
@@ -19,7 +23,35 @@ const steps = [
   { label: "Rewriting URLs", threshold: 90 },
 ];
 
-export default function ProgressModal({ isOpen, progress, onClose }: ProgressModalProps) {
+export default function ProgressModal({ isOpen, progress, projectId, projectStatus, onClose }: ProgressModalProps) {
+  const pauseMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectId) return;
+      const res = await apiRequest("POST", `/api/projects/${projectId}/pause`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      }
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectId) return;
+      const res = await apiRequest("POST", `/api/projects/${projectId}/resume`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      }
+    },
+  });
+
   if (!isOpen) return null;
 
   const getStepStatus = (threshold: number) => {
@@ -27,6 +59,8 @@ export default function ProgressModal({ isOpen, progress, onClose }: ProgressMod
     if (progress.progress === threshold || progress.step.toLowerCase().includes(steps.find(s => s.threshold === threshold)?.label.toLowerCase() || "")) return "active";
     return "pending";
   };
+
+  const isPaused = projectStatus === "paused";
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -89,13 +123,51 @@ export default function ProgressModal({ isOpen, progress, onClose }: ProgressMod
           )}
         </div>
 
-        <div className="p-6 border-t border-border flex justify-end gap-2">
-          <button
-            className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-all"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
+        <div className="p-6 border-t border-border flex justify-between items-center gap-2">
+          <div className="text-sm text-muted-foreground">
+            {isPaused && (
+              <span className="flex items-center gap-2 text-amber-500">
+                <Pause className="w-4 h-4" />
+                Paused - You can navigate away and resume later
+              </span>
+            )}
+            {!isPaused && projectStatus === "processing" && (
+              <span className="text-muted-foreground">
+                Background cloning in progress...
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {projectId && !isPaused && projectStatus === "processing" && (
+              <button
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all flex items-center gap-2"
+                onClick={() => pauseMutation.mutate()}
+                disabled={pauseMutation.isPending}
+                data-testid="button-pause"
+              >
+                <Pause className="w-4 h-4" />
+                Pause
+              </button>
+            )}
+            {projectId && isPaused && (
+              <button
+                className="px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-all flex items-center gap-2"
+                onClick={() => resumeMutation.mutate()}
+                disabled={resumeMutation.isPending}
+                data-testid="button-resume"
+              >
+                <Play className="w-4 h-4" />
+                Resume
+              </button>
+            )}
+            <button
+              className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-all"
+              onClick={onClose}
+              data-testid="button-close-progress"
+            >
+              {isPaused ? "Close" : "Minimize"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
