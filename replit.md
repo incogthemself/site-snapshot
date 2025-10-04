@@ -34,8 +34,10 @@ Preferred communication style: Simple, everyday language.
 - Live code editor with syntax highlighting
 - Live preview iframe showing rendered HTML
 - Responsive viewport modes (mobile, tablet, desktop)
-- Real-time progress modal during website cloning
+- Real-time progress modal during website cloning with pause/resume controls
+- Background downloading with progress persistence across page refreshes
 - Success modal with download functionality
+- Automatic progress recovery when returning to the application
 
 ### Backend Architecture
 
@@ -53,6 +55,9 @@ Preferred communication style: Simple, everyday language.
    - Downloads CSS, JavaScript, images, and fonts
    - Rewrites URLs to work with local file paths
    - Reports progress through callback mechanism
+   - Persists progress after each major step to storage
+   - Supports pause/resume functionality
+   - Checks for pause status before processing each file
 
 2. **Playwright Service** (`server/services/playwright.ts`)
    - Manages headless Chromium browser instance
@@ -71,6 +76,8 @@ Preferred communication style: Simple, everyday language.
 - WebSocket endpoint at `/ws` for progress streaming
 - Request/response logging middleware
 - JSON body parsing with raw body preservation
+- Pause/Resume API endpoints: `POST /api/projects/:id/pause` and `POST /api/projects/:id/resume`
+- Background cloning runs independently of client connection
 
 **Data Storage**
 - In-memory storage implementation (`MemStorage`) using Map data structures
@@ -97,9 +104,13 @@ projects:
   - id (UUID primary key)
   - url (text)
   - name (text)
-  - status (pending/processing/complete/error)
+  - status (pending/processing/complete/error/paused)
   - totalFiles (integer)
   - totalSize (integer, bytes)
+  - currentStep (text, nullable) - current cloning step
+  - progressPercentage (integer) - 0-100 completion percentage
+  - filesProcessed (integer) - number of files processed so far
+  - isPaused (integer) - 0 = false, 1 = true
   - createdAt (timestamp)
   - completedAt (timestamp, nullable)
   - errorMessage (text, nullable)
