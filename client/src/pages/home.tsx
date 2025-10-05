@@ -310,74 +310,78 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Top Navigation Bar */}
-      <header className="border-b border-border bg-card px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <h1 className="text-base sm:text-xl font-bold truncate">WebClone Studio</h1>
-        </div>
-
-        {/* URL Input Section */}
-        <div className="flex-1 max-w-3xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="flex-1 relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              type="url"
-              placeholder="Enter URL (e.g., https://example.com/page)"
-              className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleClone()}
-              data-testid="input-url"
-            />
+      <header className="border-b border-border bg-card px-3 sm:px-6 py-2 sm:py-4 flex-shrink-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {/* Logo and Title */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <h1 className="text-base sm:text-xl font-bold">WebClone Studio</h1>
+            </div>
+            {/* Mobile-only action buttons */}
+            <div className="flex sm:hidden items-center gap-2">
+              {currentProject?.status === "complete" && (
+                <Button variant="ghost" size="icon" onClick={() => setShowPreview(true)}>
+                  <Eye className="w-4 h-4" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Select value={cloneMethod} onValueChange={(value: "static" | "playwright") => setCloneMethod(value)}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="static">Static Clone</SelectItem>
-                <SelectItem value="playwright">Dynamic Clone</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={handleClone} disabled={createProjectMutation.isPending} className="flex-1 sm:flex-none" data-testid="button-clone">
-              <Download className="w-4 h-4" />
-              <span className="ml-2">Clone Site</span>
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => setShowSettings(true)} data-testid="button-settings-mobile">
-              <Settings className="w-4 h-4" />
+
+          {/* URL Input Section */}
+          <div className="flex-1 flex flex-col gap-2 sm:flex-row sm:max-w-3xl sm:mx-4">
+            <div className="flex-1 relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                type="url"
+                placeholder="Enter URL..."
+                className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2 text-sm sm:text-base"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleClone()}
+                data-testid="input-url"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={cloneMethod} onValueChange={(value: "static" | "playwright") => setCloneMethod(value)}>
+                <SelectTrigger className="w-32 sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="static">Static</SelectItem>
+                  <SelectItem value="playwright">Dynamic</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleClone} disabled={createProjectMutation.isPending} className="flex-1 sm:flex-none" data-testid="button-clone">
+                <Download className="w-4 h-4" />
+                <span className="ml-2 hidden sm:inline">Clone Site</span>
+                <span className="ml-2 sm:hidden">Clone</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Desktop-only action buttons */}
+          <div className="hidden sm:flex items-center gap-2">
+            {currentProject?.status === "complete" && (
+              <Button variant="ghost" size="icon" onClick={() => setShowPreview(true)} data-testid="button-preview">
+                <Eye className="w-5 h-5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} data-testid="button-settings">
+              <Settings className="w-5 h-5" />
             </Button>
           </div>
-        </div>
-
-
-        <div className="hidden sm:flex items-center gap-2">
-          {currentProject?.status === "complete" && (
-            <button
-              className="p-2 rounded-lg hover:bg-muted transition-all"
-              title="Preview Site"
-              onClick={() => setShowPreview(true)}
-              data-testid="button-preview"
-            >
-              <Eye className="text-muted-foreground w-5 h-5" />
-            </button>
-          )}
-          <button
-            className="p-2 rounded-lg hover:bg-muted transition-all"
-            title="Settings"
-            onClick={() => setShowSettings(true)}
-            data-testid="button-settings"
-          >
-            <Settings className="text-muted-foreground w-5 h-5" />
-          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Projects Sidebar */}
-        <div className={`${isMobileView ? 'w-full border-b' : 'w-64 lg:w-80 border-r'} border-border bg-card p-3 sm:p-4 overflow-y-auto flex-shrink-0`}>
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Your Projects</h2>
+        <div className={`${isMobileView ? 'hidden' : 'w-64 lg:w-80 border-r'} border-border bg-card p-3 sm:p-4 overflow-y-auto flex-shrink-0`}>
+          <h2 className="text-sm sm:text-lg font-semibold mb-3">Projects</h2>
           {projects.length === 0 && !projectsLoading && (
             <div className="text-muted-foreground text-sm p-3 text-center">
               No projects found. Clone a website to get started.
@@ -435,21 +439,44 @@ export default function Home() {
 
         {/* Workspace */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          {/* Mobile Project Selector */}
+          {isMobileView && (
+            <div className="border-b border-border bg-card p-3">
+              <Select value={selectedProjectId || ""} onValueChange={(value) => {
+                setSelectedProjectId(value);
+                setSelectedFile(null);
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project">
+                    {currentProject ? currentProject.name : "No project selected"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
           {currentProject ? ( // Check if currentProject is not null
             <>
               <Tabs defaultValue="preview" className="flex-1 flex flex-col min-h-0">
-                <TabsList className="border-b border-border rounded-none bg-card px-2 sm:px-4 flex-shrink-0">
-                  <TabsTrigger value="preview" className="text-xs sm:text-sm">
-                    <Eye className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Preview</span>
+                <TabsList className="border-b border-border rounded-none bg-card px-2 sm:px-4 flex-shrink-0 w-full justify-start">
+                  <TabsTrigger value="preview" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                    <Eye className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span>Preview</span>
                   </TabsTrigger>
-                  <TabsTrigger value="code" className="text-xs sm:text-sm">
-                    <Code className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Code</span>
+                  <TabsTrigger value="code" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                    <Code className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span>Code</span>
                   </TabsTrigger>
-                  <TabsTrigger value="files" className="text-xs sm:text-sm">
-                    <FileCode className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Files</span>
+                  <TabsTrigger value="files" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                    <FileCode className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span>Files</span>
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="preview" className="flex-1 min-h-0 overflow-hidden">

@@ -2,29 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: hsl(220, 40%, 5%);
-  --foreground: hsl(220, 10%, 92%);
-  --card: hsl(220, 35%, 9%);
-  --card-foreground: hsl(220, 10%, 92%);
-  --popover: hsl(220, 35%, 9%);
-  --popover-foreground: hsl(220, 10%, 92%);
-  --primary: hsl(217, 91%, 60%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(220, 15%, 20%);
-  --secondary-foreground: hsl(220, 10%, 92%);
-  --muted: hsl(220, 15%, 15%);
-  --muted-foreground: hsl(220, 10%, 50%);
-  --accent: hsl(188, 94%, 43%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(220, 15%, 20%);
-  --input: hsl(220, 15%, 20%);
-  --ring: hsl(217, 91%, 60%);
-  --radius: 0.5rem;
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+/* Mobile viewport fix */
+@viewport {
+  width: device-width;
 }
 
 @layer base {
@@ -95,70 +75,70 @@
   .monaco-editor-container {
     min-height: 250px;
   }
-  
+
   /* Improve touch targets - standard is 44x44px minimum */
   button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
     padding: 12px 16px;
   }
-  
+
   /* Better mobile scrolling */
   * {
     -webkit-overflow-scrolling: touch;
   }
-  
+
   /* Prevent zoom on input focus */
   input, select, textarea {
     font-size: 16px !important;
   }
-  
+
   /* Mobile-optimized spacing */
   body {
     font-size: 14px;
   }
-  
+
   /* Reduce padding on containers */
   .container {
     padding-left: 16px;
     padding-right: 16px;
   }
-  
+
   /* Make cards more compact */
   .card {
     padding: 12px;
   }
-  
+
   /* Improve dialog/modal sizing */
   [role="dialog"] {
     max-width: calc(100vw - 32px);
     margin: 16px;
   }
-  
+
   /* Better mobile navigation */
   nav {
     padding: 8px 16px;
   }
-  
+
   /* Responsive text sizing */
   h1 {
     font-size: 1.75rem;
   }
-  
+
   h2 {
     font-size: 1.5rem;
   }
-  
+
   h3 {
     font-size: 1.25rem;
   }
-  
+
   /* Improve mobile table display */
   table {
     display: block;
     overflow-x: auto;
   }
-  
+
   /* Stack flex items on mobile when needed */
   .flex-mobile-stack {
     flex-direction: column;
@@ -170,20 +150,20 @@
   body {
     font-size: 13px;
   }
-  
+
   button, a, [role="button"] {
     padding: 10px 14px;
   }
-  
+
   .container {
     padding-left: 12px;
     padding-right: 12px;
   }
-  
+
   h1 {
     font-size: 1.5rem;
   }
-  
+
   h2 {
     font-size: 1.25rem;
   }
