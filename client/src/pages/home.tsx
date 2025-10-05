@@ -11,8 +11,11 @@ import SuccessModal from "@/components/SuccessModal";
 import SettingsDialog from "@/components/SettingsDialog";
 import EstimateDialog from "@/components/EstimateDialog";
 import SitePreview from "@/components/SitePreview";
-import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor, Eye } from "lucide-react";
+import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor, Eye, Zap, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -33,9 +36,11 @@ export default function Home() {
   const [progressByProject, setProgressByProject] = useState<Map<string, { progress: number; step: string; currentFile: string }>>(new Map());
   const [activeClones, setActiveClones] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+
 
   // Get progress for current project
-  const progress = currentProject 
+  const progress = currentProject
     ? progressByProject.get(currentProject.id) || { progress: 0, step: "", currentFile: "" }
     : { progress: 0, step: "", currentFile: "" };
 
@@ -101,7 +106,7 @@ export default function Home() {
       const ongoingProjects = projects.filter(
         (p) => p.status === "processing" || p.status === "paused"
       );
-      
+
       // Update active clones set
       const activeIds = new Set(ongoingProjects.map(p => p.id));
       setActiveClones(activeIds);
@@ -141,7 +146,7 @@ export default function Home() {
         try {
           const response = await fetch(`/api/projects/${projectId}`);
           const updatedProject = await response.json();
-          
+
           // Update progress map
           setProgressByProject((prev) => {
             const newMap = new Map(prev);
@@ -152,7 +157,7 @@ export default function Home() {
             });
             return newMap;
           });
-          
+
           // Handle completion/error
           if (updatedProject.status === "complete") {
             setActiveClones((prev) => {
@@ -236,7 +241,7 @@ export default function Home() {
     onSuccess: (project: Project) => {
       // Add to active clones
       setActiveClones((prev) => new Set(prev).add(project.id));
-      
+
       // Initialize progress for this project
       setProgressByProject((prev) => {
         const newMap = new Map(prev);
@@ -249,7 +254,7 @@ export default function Home() {
       setShowProgress(true);
       setShowEstimate(false);
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      
+
       toast({
         title: "Clone Started",
         description: `Cloning ${project.name} in the background`,
@@ -300,61 +305,65 @@ export default function Home() {
     }
   };
 
+
+  useEffect(() => {
+    if (selectedFile) {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${currentProject?.id}/files/${selectedFile.id}`] });
+    }
+  }, [selectedFile, currentProject?.id]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Top Navigation Bar */}
-      <header className="bg-card border-b border-border px-2 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 flex-shrink-0">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2">
-            <i className="fas fa-code text-primary text-xl"></i>
-            <h1 className="text-base sm:text-lg font-bold text-foreground">WebClone Studio</h1>
-          </div>
-          <div className="flex items-center gap-2 ml-auto sm:hidden">
-            {currentProject?.status === "complete" && (
-              <button
-                className="p-2 rounded-lg hover:bg-muted transition-all"
-                title="Preview Site"
-                onClick={() => setShowPreview(true)}
-                data-testid="button-preview-mobile"
-              >
-                <Eye className="text-muted-foreground w-5 h-5" />
-              </button>
-            )}
-            <button
-              className="p-2 rounded-lg hover:bg-muted transition-all"
-              title="Settings"
-              onClick={() => setShowSettings(true)}
-              data-testid="button-settings-mobile"
-            >
-              <Settings className="text-muted-foreground w-5 h-5" />
-            </button>
-          </div>
+      <header className="border-b border-border bg-card px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+          <h1 className="text-base sm:text-xl font-bold truncate">WebClone Studio</h1>
         </div>
 
         {/* URL Input Section */}
-        <div className="flex-1 w-full sm:max-w-3xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex-1 max-w-3xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex-1 relative">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <input
+            <Input
               type="url"
               placeholder="Enter URL (e.g., https://example.com/page)"
-              className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2.5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              className="w-full bg-muted border border-input rounded-lg pl-10 pr-4 py-2 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleClone()}
               data-testid="input-url"
             />
           </div>
-          <button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 sm:px-6 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
-            onClick={handleClone}
-            disabled={createProjectMutation.isPending}
-            data-testid="button-clone"
-          >
-            <Download className="w-4 h-4" />
-            Clone Site
-          </button>
+          <div className="flex gap-2">
+            <Select value={cloneMethod} onValueChange={(value: "static" | "playwright") => setCloneMethod(value)}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="static">Static Clone</SelectItem>
+                <SelectItem value="playwright">Dynamic Clone</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleClone} disabled={createProjectMutation.isPending} className="flex-1 sm:flex-none" data-testid="button-clone">
+              <Download className="w-4 h-4" />
+              <span className="ml-2">Clone Site</span>
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setShowSettings(true)} data-testid="button-settings-mobile">
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
+
 
         <div className="hidden sm:flex items-center gap-2">
           {currentProject?.status === "complete" && (
@@ -378,64 +387,130 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      {/* Mobile: Tabs Layout */}
-      <div className="flex-1 flex lg:hidden overflow-hidden">
-        <Tabs defaultValue="files" className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 bg-card border-b border-border rounded-none h-12">
-            <TabsTrigger value="files" className="flex items-center gap-2 data-[state=active]:bg-muted">
-              <FileCode className="w-4 h-4" />
-              <span className="hidden sm:inline">Files</span>
-            </TabsTrigger>
-            <TabsTrigger value="editor" className="flex items-center gap-2 data-[state=active]:bg-muted">
-              <Code className="w-4 h-4" />
-              <span className="hidden sm:inline">Editor</span>
-            </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center gap-2 data-[state=active]:bg-muted">
-              <Monitor className="w-4 h-4" />
-              <span className="hidden sm:inline">Preview</span>
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="files" className="flex-1 overflow-hidden mt-0">
-            <FileExplorer
-              files={files}
-              currentProject={currentProject}
-              onFileSelect={setSelectedFile}
-              onProjectSelect={setCurrentProject}
-            />
-          </TabsContent>
-          <TabsContent value="editor" className="flex-1 overflow-hidden mt-0">
-            <CodeEditor file={selectedFile} projectId={currentProject?.id} />
-          </TabsContent>
-          <TabsContent value="preview" className="flex-1 overflow-hidden mt-0">
-            <LivePreview projectId={currentProject?.id} file={selectedFile} />
-          </TabsContent>
-        </Tabs>
-      </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
+        {/* Projects Sidebar */}
+        <div className={`${isMobileView ? 'w-full border-b' : 'w-64 lg:w-80 border-r'} border-border bg-card p-3 sm:p-4 overflow-y-auto flex-shrink-0`}>
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Your Projects</h2>
+          {projects.length === 0 && !projectsQuery.isLoading && (
+            <div className="text-muted-foreground text-sm p-3 text-center">
+              No projects found. Clone a website to get started.
+            </div>
+          )}
+          {projects.map((project) => (
+            <div
+              key={project.id}
+              className={`p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
+                selectedProject === project.id
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/50"
+              }`}
+              onClick={() => {
+                setCurrentProject(project);
+                setSelectedFile(null); // Deselect file when project changes
+                if (isMobileView) {
+                  // On mobile, navigate to the workspace view
+                  // This would typically involve routing or a state change to show the workspace
+                  // For simplicity here, we'll assume the Tabs component handles this
+                }
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm sm:text-base font-medium truncate">{project.name}</h3>
+                  <p className="text-xs text-muted-foreground truncate mt-1">{project.url}</p>
+                </div>
+                <div className="flex-shrink-0">
+                  {project.status === "processing" && (
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  )}
+                  {project.status === "paused" && (
+                    <HelpCircle className="w-4 h-4 text-yellow-500" />
+                  )}
+                  {project.status === "complete" && (
+                    <Eye className="w-4 h-4 text-green-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); setCurrentProject(project); setShowPreview(true); }} />
+                  )}
+                  {project.status === "error" && (
+                    <Zap className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {/* Optional: Display progress within the project list item */}
+              {progressByProject.has(project.id) && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700">
+                    <div className="bg-primary h-1.5 rounded-full" style={{ width: `${progressByProject.get(project.id)?.progress || 0}%` }}></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
 
-      {/* Desktop: Side-by-Side Layout */}
-      <div className="flex-1 hidden lg:flex overflow-hidden">
-        <FileExplorer
-          files={files}
-          currentProject={currentProject}
-          onFileSelect={setSelectedFile}
-          onProjectSelect={setCurrentProject}
-        />
-
-        <div className="w-1 bg-border cursor-col-resize" />
-
-        <CodeEditor file={selectedFile} projectId={currentProject?.id} />
-
-        <div className="w-1 bg-border cursor-col-resize" />
-
-        <LivePreview projectId={currentProject?.id} file={selectedFile} />
+        {/* Workspace */}
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          {selectedProject ? (
+            <>
+              <Tabs defaultValue="preview" className="flex-1 flex flex-col min-h-0">
+                <TabsList className="border-b border-border rounded-none bg-card px-2 sm:px-4 flex-shrink-0">
+                  <TabsTrigger value="preview" className="text-xs sm:text-sm">
+                    <Eye className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Preview</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="code" className="text-xs sm:text-sm">
+                    <Code className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Code</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="files" className="text-xs sm:text-sm">
+                    <FileCode className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Files</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="preview" className="flex-1 min-h-0 overflow-hidden">
+                  {currentProject && (
+                    <SitePreview
+                      isOpen={showPreview}
+                      onClose={() => setShowPreview(false)}
+                      project={currentProject}
+                    />
+                  )}
+                </TabsContent>
+                <TabsContent value="code" className="flex-1 min-h-0 overflow-hidden">
+                  <CodeEditor file={selectedFile} projectId={currentProject?.id} />
+                </TabsContent>
+                <TabsContent value="files" className="flex-1 min-h-0 overflow-hidden">
+                  <FileExplorer
+                    files={files}
+                    currentProject={currentProject}
+                    onFileSelect={(file) => {
+                      setSelectedFile(file);
+                      if (isMobileView) {
+                        // On mobile, switch to code editor view when a file is selected
+                        // This would typically involve routing or a state change
+                      }
+                    }}
+                    onProjectSelect={setCurrentProject}
+                  />
+                </TabsContent>
+              </Tabs>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground p-4">
+              <div className="text-center max-w-sm">
+                <Globe className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 opacity-20" />
+                <p className="text-base sm:text-lg">Select a project to get started</p>
+                <p className="text-xs sm:text-sm mt-2">Or clone a new website using the input above</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom Status Bar */}
       <footer className="bg-card border-t border-border px-2 sm:px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 text-xs flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto overflow-hidden">
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <div className={`w-2 h-2 rounded-full ${currentProject?.status === 'processing' ? 'bg-primary animate-pulse' : currentProject?.status === 'complete' ? 'bg-green-500' : currentProject?.status === 'error' ? 'bg-red-500' : 'bg-accent'} `} />
             <span className="text-muted-foreground">
               {currentProject?.status === "complete" ? "Ready" : currentProject?.status || "Idle"}
             </span>
