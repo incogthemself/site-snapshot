@@ -37,6 +37,7 @@ export default function Home() {
   const [activeClones, setActiveClones] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null); // State to keep track of the selected project ID
 
 
   // Get progress for current project
@@ -96,43 +97,29 @@ export default function Home() {
     };
   }, [currentProject, queryClient]);
 
-  const { data: projects = [] } = useQuery<Project[]>({
+  // Fetch projects
+  const projectsQuery = useQuery<Project[]>({
     queryKey: ["/api/projects"],
+    refetchInterval: (query) => {
+      const projects = query.state.data || [];
+      const hasInProgress = projects.some(p => p.status === "processing"); // Changed from "cloning" to "processing"
+      return hasInProgress ? 2000 : false;
+    },
   });
 
-  // Check for ongoing projects on load and restore progress display
+  const { data: projects = [], isLoading: projectsLoading } = projectsQuery;
+
   useEffect(() => {
-    if (projects.length > 0) {
-      const ongoingProjects = projects.filter(
-        (p) => p.status === "processing" || p.status === "paused"
-      );
-
-      // Update active clones set
-      const activeIds = new Set(ongoingProjects.map(p => p.id));
-      setActiveClones(activeIds);
-
-      // Initialize progress for all ongoing projects
-      ongoingProjects.forEach((project) => {
-        setProgressByProject((prev) => {
-          const newMap = new Map(prev);
-          if (!newMap.has(project.id)) {
-            newMap.set(project.id, {
-              progress: project.progressPercentage || 0,
-              step: project.currentStep || "",
-              currentFile: "",
-            });
-          }
-          return newMap;
-        });
-      });
-
-      // If there's an ongoing project and no current project, set it
-      if (ongoingProjects.length > 0 && !currentProject) {
-        setCurrentProject(ongoingProjects[0]);
-        setShowProgress(true);
-      }
+    if (!projectsLoading && projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
     }
-  }, [projects, currentProject]);
+  }, [projects, projectsLoading, selectedProjectId]);
+
+  useEffect(() => {
+    // Find the current project based on selectedProjectId
+    setCurrentProject(projects.find((p) => p.id === selectedProjectId) || null);
+  }, [projects, selectedProjectId]);
+
 
   // Poll for project status for ALL active clones
   useEffect(() => {
@@ -169,7 +156,7 @@ export default function Home() {
             if (currentProject?.id === updatedProject.id) {
               setShowProgress(false);
               setShowSuccess(true);
-              setCurrentProject(updatedProject);
+              setCurrentProject(updatedProject); // Ensure currentProject is updated
             } else {
               toast({
                 title: "Clone Completed",
@@ -185,7 +172,7 @@ export default function Home() {
 
             if (currentProject?.id === updatedProject.id) {
               setShowProgress(false);
-              setCurrentProject(updatedProject);
+              setCurrentProject(updatedProject); // Ensure currentProject is updated
             }
 
             toast({
@@ -251,6 +238,7 @@ export default function Home() {
 
       // Set as current project and show progress
       setCurrentProject(project);
+      setSelectedProjectId(project.id); // Set selected project ID
       setShowProgress(true);
       setShowEstimate(false);
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -392,7 +380,7 @@ export default function Home() {
         {/* Projects Sidebar */}
         <div className={`${isMobileView ? 'w-full border-b' : 'w-64 lg:w-80 border-r'} border-border bg-card p-3 sm:p-4 overflow-y-auto flex-shrink-0`}>
           <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Your Projects</h2>
-          {projects.length === 0 && !projectsQuery.isLoading && (
+          {projects.length === 0 && !projectsLoading && (
             <div className="text-muted-foreground text-sm p-3 text-center">
               No projects found. Clone a website to get started.
             </div>
@@ -401,12 +389,12 @@ export default function Home() {
             <div
               key={project.id}
               className={`p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
-                selectedProject === project.id
+                selectedProjectId === project.id // Use selectedProjectId for highlighting
                   ? "border-primary bg-primary/10"
                   : "border-border hover:border-primary/50"
               }`}
               onClick={() => {
-                setCurrentProject(project);
+                setSelectedProjectId(project.id); // Set selected project ID
                 setSelectedFile(null); // Deselect file when project changes
                 if (isMobileView) {
                   // On mobile, navigate to the workspace view
@@ -449,7 +437,7 @@ export default function Home() {
 
         {/* Workspace */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-          {selectedProject ? (
+          {currentProject ? ( // Check if currentProject is not null
             <>
               <Tabs defaultValue="preview" className="flex-1 flex flex-col min-h-0">
                 <TabsList className="border-b border-border rounded-none bg-card px-2 sm:px-4 flex-shrink-0">
@@ -489,7 +477,7 @@ export default function Home() {
                         // This would typically involve routing or a state change
                       }
                     }}
-                    onProjectSelect={setCurrentProject}
+                    onProjectSelect={setSelectedProjectId} // Pass setSelectedProjectId here
                   />
                 </TabsContent>
               </Tabs>
