@@ -8,6 +8,39 @@ This is a full-stack web application that clones websites by downloading all the
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Enhancements (October 2025)
+
+### Clone Method Selection
+- **Static Mirror Mode (Default)**: Fast cloning using Cheerio without headless browser - 2-3x faster than Playwright mode
+- **Dynamic Clone Mode (Playwright)**: Headless browser rendering for JavaScript-heavy sites that require execution
+
+### Estimation System
+- Pre-clone estimation shows:
+  - Estimated time to complete (in seconds/minutes)
+  - Estimated ZIP file size (in KB/MB)
+  - Number of resources to download
+- Estimation runs before starting the clone, giving users informed choices
+
+### Concurrent Cloning
+- Multiple sites can be cloned simultaneously
+- Each clone runs independently in the background
+- Progress tracked separately for each project
+- Toast notifications for background clones that complete
+- Active clones tracked with per-project progress maps
+
+### Site Preview
+- 1:1 preview of cloned websites after download
+- Preview opens in a modal dialog with iframe
+- Refresh and open-in-new-tab options available
+- Static file serving from cloned site directory
+
+### User Interface
+- Settings dialog to choose between static/dynamic cloning modes
+- Estimate dialog shows predictions before cloning starts
+- Preview button appears when a project is complete
+- Real-time progress tracking with step-by-step updates
+- Status bar shows actual file size and count
+
 ## System Architecture
 
 ### Frontend Architecture

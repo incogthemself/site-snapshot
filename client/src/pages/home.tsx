@@ -29,8 +29,14 @@ export default function Home() {
     estimatedSize: number;
     resourceCount: number;
   } | null>(null);
-  const [progress, setProgress] = useState({ progress: 0, step: "", currentFile: "" });
+  const [progressByProject, setProgressByProject] = useState<Map<string, { progress: number; step: string; currentFile: string }>>(new Map());
+  const [activeClones, setActiveClones] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  // Get progress for current project
+  const progress = currentProject 
+    ? progressByProject.get(currentProject.id) || { progress: 0, step: "", currentFile: "" }
+    : { progress: 0, step: "", currentFile: "" };
 
   // WebSocket for progress updates
   useEffect(() => {
@@ -39,24 +45,50 @@ export default function Home() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setProgress(data);
+      const { projectId, progress, step, currentFile } = data;
 
-      if (data.progress === 100) {
+      // Update progress for specific project
+      setProgressByProject((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(projectId, { progress, step, currentFile });
+        return newMap;
+      });
+
+      // Handle completion/error for any project (not just current)
+      if (progress === 100) {
         setTimeout(() => {
-          setShowProgress(false);
-          setShowSuccess(true);
-          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-          if (currentProject) {
-            queryClient.invalidateQueries({ queryKey: ["/api/projects", currentProject.id] });
+          // Remove from active clones
+          setActiveClones((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(projectId);
+            return newSet;
+          });
+
+          // If this is the current project, show success modal
+          if (currentProject?.id === projectId) {
+            setShowProgress(false);
+            setShowSuccess(true);
+          } else {
+            // Background clone completed - show toast notification
+            toast({
+              title: "Clone Completed",
+              description: `Background clone finished successfully`,
+            });
           }
         }, 500);
+      }
+
+      // Always invalidate queries when progress updates
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
       }
     };
 
     return () => {
       ws.close();
     };
-  }, [currentProject]);
+  }, [currentProject, queryClient]);
 
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -65,60 +97,112 @@ export default function Home() {
   // Check for ongoing projects on load and restore progress display
   useEffect(() => {
     if (projects.length > 0) {
-      const ongoingProject = projects.find(
+      const ongoingProjects = projects.filter(
         (p) => p.status === "processing" || p.status === "paused"
       );
-      if (ongoingProject) {
-        setCurrentProject(ongoingProject);
-        setShowProgress(true);
-        setProgress({
-          progress: ongoingProject.progressPercentage || 0,
-          step: ongoingProject.currentStep || "",
-          currentFile: "",
+      
+      // Update active clones set
+      const activeIds = new Set(ongoingProjects.map(p => p.id));
+      setActiveClones(activeIds);
+
+      // Initialize progress for all ongoing projects
+      ongoingProjects.forEach((project) => {
+        setProgressByProject((prev) => {
+          const newMap = new Map(prev);
+          if (!newMap.has(project.id)) {
+            newMap.set(project.id, {
+              progress: project.progressPercentage || 0,
+              step: project.currentStep || "",
+              currentFile: "",
+            });
+          }
+          return newMap;
         });
+      });
+
+      // If there's an ongoing project and no current project, set it
+      if (ongoingProjects.length > 0 && !currentProject) {
+        setCurrentProject(ongoingProjects[0]);
+        setShowProgress(true);
       }
     }
-  }, [projects]);
+  }, [projects, currentProject]);
 
-  // Poll for project status when there's an ongoing project
+  // Poll for project status for ALL active clones
   useEffect(() => {
-    if (!currentProject || (currentProject.status !== "processing" && currentProject.status !== "paused")) {
+    if (activeClones.size === 0) {
       return;
     }
 
     const interval = setInterval(async () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", currentProject.id] });
-      
-      const response = await fetch(`/api/projects/${currentProject.id}`);
-      const updatedProject = await response.json();
-      
-      // Update the current project reference with the latest status
-      setCurrentProject(updatedProject);
-      
-      if (updatedProject.status === "complete") {
-        setShowProgress(false);
-        setShowSuccess(true);
-        clearInterval(interval);
-      } else if (updatedProject.status === "error") {
-        setShowProgress(false);
-        toast({
-          title: "Cloning Failed",
-          description: updatedProject.errorMessage || "Unknown error occurred",
-          variant: "destructive",
-        });
-        clearInterval(interval);
-      } else {
-        setProgress({
-          progress: updatedProject.progressPercentage || 0,
-          step: updatedProject.currentStep || "",
-          currentFile: "",
-        });
+      // Poll all active clones
+      for (const projectId of Array.from(activeClones)) {
+        try {
+          const response = await fetch(`/api/projects/${projectId}`);
+          const updatedProject = await response.json();
+          
+          // Update progress map
+          setProgressByProject((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(updatedProject.id, {
+              progress: updatedProject.progressPercentage || 0,
+              step: updatedProject.currentStep || "",
+              currentFile: "",
+            });
+            return newMap;
+          });
+          
+          // Handle completion/error
+          if (updatedProject.status === "complete") {
+            setActiveClones((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(updatedProject.id);
+              return newSet;
+            });
+
+            if (currentProject?.id === updatedProject.id) {
+              setShowProgress(false);
+              setShowSuccess(true);
+              setCurrentProject(updatedProject);
+            } else {
+              toast({
+                title: "Clone Completed",
+                description: `${updatedProject.name} cloned successfully`,
+              });
+            }
+          } else if (updatedProject.status === "error") {
+            setActiveClones((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(updatedProject.id);
+              return newSet;
+            });
+
+            if (currentProject?.id === updatedProject.id) {
+              setShowProgress(false);
+              setCurrentProject(updatedProject);
+            }
+
+            toast({
+              title: "Cloning Failed",
+              description: updatedProject.errorMessage || "Unknown error occurred",
+              variant: "destructive",
+            });
+          } else if (currentProject?.id === updatedProject.id) {
+            // Update current project if still processing
+            setCurrentProject(updatedProject);
+          }
+
+          // Invalidate queries
+          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+        } catch (error) {
+          console.error(`Failed to poll project ${projectId}:`, error);
+        }
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [currentProject, toast]);
+  }, [activeClones, currentProject, toast, queryClient]);
 
   const { data: files = [] } = useQuery<ProjectFile[]>({
     queryKey: ["/api/projects", currentProject?.id, "files"],
@@ -149,10 +233,26 @@ export default function Home() {
       return res.json();
     },
     onSuccess: (project: Project) => {
+      // Add to active clones
+      setActiveClones((prev) => new Set(prev).add(project.id));
+      
+      // Initialize progress for this project
+      setProgressByProject((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(project.id, { progress: 0, step: "Starting...", currentFile: "" });
+        return newMap;
+      });
+
+      // Set as current project and show progress
       setCurrentProject(project);
       setShowProgress(true);
       setShowEstimate(false);
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      
+      toast({
+        title: "Clone Started",
+        description: `Cloning ${project.name} in the background`,
+      });
     },
     onError: (error: Error) => {
       toast({
