@@ -8,7 +8,10 @@ import CodeEditor from "@/components/CodeEditor";
 import LivePreview from "@/components/LivePreview";
 import ProgressModal from "@/components/ProgressModal";
 import SuccessModal from "@/components/SuccessModal";
-import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor } from "lucide-react";
+import SettingsDialog from "@/components/SettingsDialog";
+import EstimateDialog from "@/components/EstimateDialog";
+import SitePreview from "@/components/SitePreview";
+import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor, Eye } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
@@ -17,6 +20,15 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [showProgress, setShowProgress] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showEstimate, setShowEstimate] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [cloneMethod, setCloneMethod] = useState<"static" | "playwright">("static");
+  const [estimate, setEstimate] = useState<{
+    estimatedTime: number;
+    estimatedSize: number;
+    resourceCount: number;
+  } | null>(null);
   const [progress, setProgress] = useState({ progress: 0, step: "", currentFile: "" });
   const { toast } = useToast();
 
@@ -113,14 +125,33 @@ export default function Home() {
     enabled: !!currentProject,
   });
 
+  const estimateMutation = useMutation({
+    mutationFn: async (data: { url: string; cloneMethod: string }) => {
+      const res = await apiRequest("POST", "/api/estimate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setEstimate(data);
+      setShowEstimate(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Estimation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createProjectMutation = useMutation({
-    mutationFn: async (data: { url: string; name: string }) => {
+    mutationFn: async (data: { url: string; name: string; cloneMethod: string }) => {
       const res = await apiRequest("POST", "/api/projects", data);
       return res.json();
     },
     onSuccess: (project: Project) => {
       setCurrentProject(project);
       setShowProgress(true);
+      setShowEstimate(false);
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
     },
     onError: (error: Error) => {
@@ -143,9 +174,22 @@ export default function Home() {
     }
 
     try {
+      new URL(url);
+      estimateMutation.mutate({ url, cloneMethod });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Invalid URL format",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmClone = () => {
+    try {
       const urlObj = new URL(url);
       const name = `${urlObj.hostname}_${new Date().toISOString().split("T")[0]}`;
-      createProjectMutation.mutate({ url, name });
+      createProjectMutation.mutate({ url, name, cloneMethod });
     } catch {
       toast({
         title: "Error",
@@ -165,11 +209,23 @@ export default function Home() {
             <h1 className="text-base sm:text-lg font-bold text-foreground">WebClone Studio</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto sm:hidden">
-            <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Settings">
+            {currentProject?.status === "complete" && (
+              <button
+                className="p-2 rounded-lg hover:bg-muted transition-all"
+                title="Preview Site"
+                onClick={() => setShowPreview(true)}
+                data-testid="button-preview-mobile"
+              >
+                <Eye className="text-muted-foreground w-5 h-5" />
+              </button>
+            )}
+            <button
+              className="p-2 rounded-lg hover:bg-muted transition-all"
+              title="Settings"
+              onClick={() => setShowSettings(true)}
+              data-testid="button-settings-mobile"
+            >
               <Settings className="text-muted-foreground w-5 h-5" />
-            </button>
-            <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Help">
-              <HelpCircle className="text-muted-foreground w-5 h-5" />
             </button>
           </div>
         </div>
@@ -200,11 +256,23 @@ export default function Home() {
         </div>
 
         <div className="hidden sm:flex items-center gap-2">
-          <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Settings">
+          {currentProject?.status === "complete" && (
+            <button
+              className="p-2 rounded-lg hover:bg-muted transition-all"
+              title="Preview Site"
+              onClick={() => setShowPreview(true)}
+              data-testid="button-preview"
+            >
+              <Eye className="text-muted-foreground w-5 h-5" />
+            </button>
+          )}
+          <button
+            className="p-2 rounded-lg hover:bg-muted transition-all"
+            title="Settings"
+            onClick={() => setShowSettings(true)}
+            data-testid="button-settings"
+          >
             <Settings className="text-muted-foreground w-5 h-5" />
-          </button>
-          <button className="p-2 rounded-lg hover:bg-muted transition-all" title="Help">
-            <HelpCircle className="text-muted-foreground w-5 h-5" />
           </button>
         </div>
       </header>
@@ -300,6 +368,27 @@ export default function Home() {
         isOpen={showSuccess}
         project={currentProject}
         onClose={() => setShowSuccess(false)}
+      />
+
+      <SettingsDialog
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        cloneMethod={cloneMethod}
+        onSave={(method) => setCloneMethod(method)}
+      />
+
+      <EstimateDialog
+        isOpen={showEstimate}
+        onClose={() => setShowEstimate(false)}
+        onConfirm={confirmClone}
+        estimate={estimate}
+        cloneMethod={cloneMethod}
+      />
+
+      <SitePreview
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        project={currentProject}
       />
     </div>
   );

@@ -43,12 +43,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Estimate clone before starting
+  app.post("/api/estimate", async (req, res) => {
+    try {
+      const { url, cloneMethod } = req.body;
+      if (!url) {
+        return res.status(400).json({ message: "URL is required" });
+      }
+
+      const estimate = await cloneService.estimateClone(
+        url,
+        cloneMethod || "static"
+      );
+
+      res.json(estimate);
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to estimate",
+      });
+    }
+  });
+
   // Create new project and start cloning
   app.post("/api/projects", async (req, res) => {
     try {
       const data = insertProjectSchema.parse(req.body);
 
-      const project = await storage.createProject(data);
+      // Get estimation first
+      const cloneMethod = (data.cloneMethod || "playwright") as "static" | "playwright";
+      const estimate = await cloneService.estimateClone(
+        data.url,
+        cloneMethod
+      );
+
+      const project = await storage.createProject({
+        ...data,
+        estimatedTime: estimate.estimatedTime,
+        estimatedSize: estimate.estimatedSize,
+      });
 
       // Start cloning in background
       cloneService
@@ -61,7 +93,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               step,
               currentFile,
             });
-          }
+          },
+          cloneMethod
         )
         .catch((error) => {
           console.error("Clone error:", error);
@@ -173,6 +206,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Preview project (serve cloned site)
+  app.use("/api/projects/:id/preview", (req, res) => {
+    const projectDir = path.join("./cloned_sites", req.params.id);
+    const indexPath = path.join(projectDir, "index.html");
+    
+    // Serve static files from the project directory
+    const express = require("express");
+    express.static(projectDir)(req, res, () => {
+      res.sendFile(indexPath, (err: Error) => {
+        if (err) {
+          res.status(404).json({ message: "Preview not available" });
+        }
+      });
+    });
+  });
+
   // Pause project cloning
   app.post("/api/projects/:id/pause", async (req, res) => {
     try {
@@ -217,7 +266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               step,
               currentFile,
             });
-          }
+          },
+          project.cloneMethod as "static" | "playwright" || "playwright"
         )
         .catch((error) => {
           console.error("Clone error:", error);

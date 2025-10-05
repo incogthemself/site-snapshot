@@ -8,8 +8,11 @@ export const projects = pgTable("projects", {
   url: text("url").notNull(),
   name: text("name").notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, complete, error, paused
+  cloneMethod: text("clone_method").notNull().default("playwright"), // static, playwright
   totalFiles: integer("total_files").default(0),
   totalSize: integer("total_size").default(0), // in bytes
+  estimatedTime: integer("estimated_time").default(0), // in seconds
+  estimatedSize: integer("estimated_size").default(0), // in bytes
   currentStep: text("current_step"),
   progressPercentage: integer("progress_percentage").default(0),
   filesProcessed: integer("files_processed").default(0),
@@ -32,6 +35,7 @@ export const files = pgTable("files", {
 export const insertProjectSchema = createInsertSchema(projects).pick({
   url: true,
   name: true,
+  cloneMethod: true,
 });
 
 export const insertFileSchema = createInsertSchema(files).pick({

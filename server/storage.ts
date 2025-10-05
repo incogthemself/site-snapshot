@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Projects
-  createProject(project: InsertProject): Promise<Project>;
+  createProject(project: InsertProject & Partial<Pick<Project, 'estimatedTime' | 'estimatedSize'>>): Promise<Project>;
   getProject(id: string): Promise<Project | undefined>;
   getAllProjects(): Promise<Project[]>;
   updateProjectStatus(id: string, status: string, updates?: Partial<Project>): Promise<void>;
@@ -26,14 +26,17 @@ export class MemStorage implements IStorage {
     this.files = new Map();
   }
 
-  async createProject(insertProject: InsertProject): Promise<Project> {
+  async createProject(insertProject: InsertProject & Partial<Pick<Project, 'estimatedTime' | 'estimatedSize'>>): Promise<Project> {
     const id = randomUUID();
     const project: Project = {
       ...insertProject,
       id,
       status: "pending",
+      cloneMethod: insertProject.cloneMethod || "playwright",
       totalFiles: 0,
       totalSize: 0,
+      estimatedTime: insertProject.estimatedTime || 0,
+      estimatedSize: insertProject.estimatedSize || 0,
       currentStep: null,
       progressPercentage: 0,
       filesProcessed: 0,
