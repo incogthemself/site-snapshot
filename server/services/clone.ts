@@ -9,15 +9,41 @@ interface CloneProgressCallback {
 }
 
 export class CloneService {
+  private async extractLinks(html: string, baseUrl: string): Promise<string[]> {
+    const $ = cheerio.load(html);
+    const links = new Set<string>();
+    const urlObj = new URL(baseUrl);
+    const baseDomain = urlObj.hostname;
+
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+        try {
+          const absoluteUrl = new URL(href, baseUrl);
+          // Only include same-domain links
+          if (absoluteUrl.hostname === baseDomain && absoluteUrl.pathname !== urlObj.pathname) {
+            links.add(absoluteUrl.href);
+          }
+        } catch (error) {
+          // Invalid URL, skip
+        }
+      }
+    });
+
+    return Array.from(links);
+  }
+
   async cloneWebsite(
     projectId: string,
     url: string,
     onProgress?: CloneProgressCallback,
-    method: "static" | "playwright" = "playwright"
+    method: "static" | "playwright" = "playwright",
+    crawlDepth: number = 0
   ): Promise<void> {
     try {
       let html: string;
       let initialResources: string[] = [];
+      const startTime = Date.now();
 
       // Check if paused
       const project = await storage.getProject(projectId);
@@ -44,29 +70,36 @@ export class CloneService {
         });
       } else {
         // Playwright method: Slower, executes JavaScript
-        onProgress?.(5, "Initializing browser");
+        onProgress?.(2, "Initializing browser");
         await storage.updateProjectStatus(projectId, "processing", {
           currentStep: "Initializing browser",
-          progressPercentage: 5,
+          progressPercentage: 2,
         });
 
         // Pre-initialize browser to speed up
         await playwrightService.initialize();
 
-        onProgress?.(10, "Loading page with JavaScript");
+        onProgress?.(5, "Loading page with JavaScript");
         await storage.updateProjectStatus(projectId, "processing", {
           currentStep: "Loading page with JavaScript",
-          progressPercentage: 10,
+          progressPercentage: 5,
         });
 
-        const result = await playwrightService.renderPage(url);
+        const result = await playwrightService.renderPage(url, (progress) => {
+          const currentProgress = 5 + Math.floor(progress * 10);
+          onProgress?.(currentProgress, "Rendering page...");
+          storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Rendering page...",
+            progressPercentage: currentProgress,
+          });
+        });
         html = result.html;
         initialResources = result.resources;
 
-        onProgress?.(20, "Page rendered successfully");
+        onProgress?.(15, "Page rendered successfully");
         await storage.updateProjectStatus(projectId, "processing", {
           currentStep: "Page rendered successfully",
-          progressPercentage: 20,
+          progressPercentage: 15,
         });
       }
 
@@ -104,11 +137,16 @@ export class CloneService {
       const totalResources = cssLinks.size + jsScripts.size + images.size;
       let downloadedCount = 0;
 
-      onProgress?.(30, "Downloading CSS files");
-      await storage.updateProjectStatus(projectId, "processing", {
-        currentStep: "Downloading CSS files",
-        progressPercentage: 30,
-      });
+      // Calculate progress ranges: 15-30 for CSS, 30-55 for JS, 55-85 for images
+      const baseProgress = method === "playwright" ? 15 : 20;
+      
+      if (cssLinks.size > 0) {
+        onProgress?.(baseProgress, "Downloading CSS files");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Downloading CSS files",
+          progressPercentage: baseProgress,
+        });
+      }
       
       for (const href of Array.from(cssLinks)) {
         // Check if paused before each file
@@ -136,7 +174,7 @@ export class CloneService {
           $(`link[href="${href}"]`).attr("href", `./css/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(30 + (downloadedCount / totalResources) * 20);
+          const progressPercentage = Math.floor(baseProgress + (downloadedCount / totalResources) * 15);
           onProgress?.(progressPercentage, "Downloading CSS files", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading CSS files",
@@ -149,11 +187,14 @@ export class CloneService {
       }
 
       // Download JavaScript files
-      onProgress?.(50, "Downloading JavaScript files");
-      await storage.updateProjectStatus(projectId, "processing", {
-        currentStep: "Downloading JavaScript files",
-        progressPercentage: 50,
-      });
+      const jsProgress = baseProgress + 15;
+      if (jsScripts.size > 0) {
+        onProgress?.(jsProgress, "Downloading JavaScript files");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Downloading JavaScript files",
+          progressPercentage: jsProgress,
+        });
+      }
 
       for (const src of Array.from(jsScripts)) {
         // Check if paused before each file
@@ -181,7 +222,7 @@ export class CloneService {
           $(`script[src="${src}"]`).attr("src", `./js/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(50 + (downloadedCount / totalResources) * 20);
+          const progressPercentage = Math.floor(baseProgress + 15 + (downloadedCount / totalResources) * 25);
           onProgress?.(progressPercentage, "Downloading JavaScript files", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading JavaScript files",
@@ -194,11 +235,14 @@ export class CloneService {
       }
 
       // Download images
-      onProgress?.(70, "Downloading images");
-      await storage.updateProjectStatus(projectId, "processing", {
-        currentStep: "Downloading images",
-        progressPercentage: 70,
-      });
+      const imgProgress = baseProgress + 40;
+      if (images.size > 0) {
+        onProgress?.(imgProgress, "Downloading images");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Downloading images",
+          progressPercentage: imgProgress,
+        });
+      }
 
       for (const src of Array.from(images)) {
         // Check if paused before each file
@@ -226,7 +270,7 @@ export class CloneService {
           $(`img[src="${src}"]`).attr("src", `./images/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(70 + (downloadedCount / totalResources) * 15);
+          const progressPercentage = Math.floor(baseProgress + 40 + (downloadedCount / totalResources) * 30);
           onProgress?.(progressPercentage, "Downloading images", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading images",
@@ -256,6 +300,47 @@ export class CloneService {
         size: updatedHtml.length,
       });
 
+      // Crawl sub-pages if depth > 0
+      if (crawlDepth > 0) {
+        onProgress?.(88, "Discovering sub-pages");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Discovering sub-pages",
+          progressPercentage: 88,
+        });
+
+        const subLinks = await this.extractLinks(html, url);
+        const limitedLinks = subLinks.slice(0, Math.min(10, subLinks.length)); // Limit to 10 sub-pages
+
+        onProgress?.(90, `Found ${limitedLinks.length} sub-pages to clone`);
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: `Found ${limitedLinks.length} sub-pages to clone`,
+          progressPercentage: 90,
+        });
+
+        for (let i = 0; i < limitedLinks.length; i++) {
+          const subLink = limitedLinks[i];
+          const project = await storage.getProject(projectId);
+          if (project?.isPaused === 1) {
+            await storage.updateProjectStatus(projectId, "paused");
+            return;
+          }
+
+          try {
+            const subProgress = 90 + Math.floor((i / limitedLinks.length) * 8);
+            onProgress?.(subProgress, `Cloning sub-page ${i + 1}/${limitedLinks.length}`);
+            await this.cloneSinglePage(projectId, subLink, method, onProgress);
+            
+            await storage.updateProjectStatus(projectId, "processing", {
+              currentStep: `Cloning sub-page ${i + 1}/${limitedLinks.length}`,
+              progressPercentage: subProgress,
+              pagesProcessed: i + 1,
+            });
+          } catch (error) {
+            console.error(`Failed to clone sub-page: ${subLink}`, error);
+          }
+        }
+      }
+
       // Get all files for final count
       const allFiles = await storage.getFilesByProject(projectId);
       const totalSize = allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
@@ -276,6 +361,43 @@ export class CloneService {
     }
   }
 
+  private async cloneSinglePage(
+    projectId: string,
+    url: string,
+    method: "static" | "playwright",
+    onProgress?: CloneProgressCallback
+  ): Promise<void> {
+    try {
+      let html: string;
+
+      if (method === "static") {
+        const response = await fetch(url);
+        html = await response.text();
+      } else {
+        const result = await playwrightService.renderPage(url);
+        html = result.html;
+      }
+
+      const $ = cheerio.load(html);
+      const urlObj = new URL(url);
+      const pagePath = urlObj.pathname === '/' ? 'index' : urlObj.pathname.replace(/^\//, '').replace(/\//g, '_');
+      
+      // Save as separate HTML file
+      const htmlFileName = `${pagePath}.html`;
+      await fileManager.saveFile(projectId, htmlFileName, html);
+      await storage.createFile({
+        projectId,
+        path: htmlFileName,
+        content: html,
+        type: "html",
+        size: html.length,
+      });
+    } catch (error) {
+      console.error(`Failed to clone page: ${url}`, error);
+      throw error;
+    }
+  }
+
   private async fetchResource(url: string): Promise<Buffer> {
     const response = await fetch(url);
     if (!response.ok) {
@@ -284,7 +406,7 @@ export class CloneService {
     return Buffer.from(await response.arrayBuffer());
   }
 
-  async estimateClone(url: string, method: "static" | "playwright" = "static"): Promise<{
+  async estimateClone(url: string, method: "static" | "playwright" = "static", crawlDepth: number = 0): Promise<{
     estimatedTime: number;
     estimatedSize: number;
     resourceCount: number;
@@ -320,17 +442,24 @@ export class CloneService {
 
       // Estimate size (rough calculation)
       // Average CSS: 50KB, JS: 100KB, Image: 200KB
-      const estimatedSize =
+      let estimatedSize =
         htmlSize +
         cssLinks.size * 50 * 1024 +
         jsScripts.size * 100 * 1024 +
         images.size * 200 * 1024;
 
       // Estimate time (in seconds)
-      // Static: ~0.5s per resource, Playwright: ~1s per resource + 5s overhead
-      let estimatedTime = totalResources * (method === "static" ? 0.5 : 1);
+      // Static: ~0.3s per resource, Playwright: ~0.8s per resource + 3-8s overhead
+      let estimatedTime = totalResources * (method === "static" ? 0.3 : 0.8);
       if (method === "playwright") {
-        estimatedTime += 5; // Browser launch overhead
+        estimatedTime += 3; // Browser launch overhead (reduced from 5s)
+      }
+
+      // If crawling sub-pages, multiply estimates
+      if (crawlDepth > 0) {
+        const estimatedSubPages = Math.min(10, totalResources / 5); // Rough estimate
+        estimatedSize *= (1 + estimatedSubPages * 0.5); // Each sub-page ~50% of main page size
+        estimatedTime += estimatedSubPages * (method === "static" ? 2 : 4); // Add time per sub-page
       }
 
       return {

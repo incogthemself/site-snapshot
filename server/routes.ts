@@ -46,14 +46,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Estimate clone before starting
   app.post("/api/estimate", async (req, res) => {
     try {
-      const { url, cloneMethod } = req.body;
+      const { url, cloneMethod, crawlDepth } = req.body;
       if (!url) {
         return res.status(400).json({ message: "URL is required" });
       }
 
       const estimate = await cloneService.estimateClone(
         url,
-        cloneMethod || "static"
+        cloneMethod || "static",
+        crawlDepth || 0
       );
 
       res.json(estimate);
@@ -71,9 +72,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get estimation first
       const cloneMethod = (data.cloneMethod || "playwright") as "static" | "playwright";
+      const crawlDepth = data.crawlDepth || 0;
       const estimate = await cloneService.estimateClone(
         data.url,
-        cloneMethod
+        cloneMethod,
+        crawlDepth
       );
 
       const project = await storage.createProject({
@@ -94,7 +97,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               currentFile,
             });
           },
-          cloneMethod
+          cloneMethod,
+          data.crawlDepth || 0
         )
         .catch((error) => {
           console.error("Clone error:", error);

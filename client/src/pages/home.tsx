@@ -24,6 +24,7 @@ export default function Home() {
   const [showEstimate, setShowEstimate] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [cloneMethod, setCloneMethod] = useState<"static" | "playwright">("static");
+  const [crawlDepth, setCrawlDepth] = useState<number>(0);
   const [estimate, setEstimate] = useState<{
     estimatedTime: number;
     estimatedSize: number;
@@ -210,7 +211,7 @@ export default function Home() {
   });
 
   const estimateMutation = useMutation({
-    mutationFn: async (data: { url: string; cloneMethod: string }) => {
+    mutationFn: async (data: { url: string; cloneMethod: string; crawlDepth: number }) => {
       const res = await apiRequest("POST", "/api/estimate", data);
       return res.json();
     },
@@ -228,7 +229,7 @@ export default function Home() {
   });
 
   const createProjectMutation = useMutation({
-    mutationFn: async (data: { url: string; name: string; cloneMethod: string }) => {
+    mutationFn: async (data: { url: string; name: string; cloneMethod: string; crawlDepth: number }) => {
       const res = await apiRequest("POST", "/api/projects", data);
       return res.json();
     },
@@ -275,7 +276,7 @@ export default function Home() {
 
     try {
       new URL(url);
-      estimateMutation.mutate({ url, cloneMethod });
+      estimateMutation.mutate({ url, cloneMethod, crawlDepth });
     } catch {
       toast({
         title: "Error",
@@ -289,7 +290,7 @@ export default function Home() {
     try {
       const urlObj = new URL(url);
       const name = `${urlObj.hostname}_${new Date().toISOString().split("T")[0]}`;
-      createProjectMutation.mutate({ url, name, cloneMethod });
+      createProjectMutation.mutate({ url, name, cloneMethod, crawlDepth });
     } catch {
       toast({
         title: "Error",
@@ -474,7 +475,11 @@ export default function Home() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         cloneMethod={cloneMethod}
-        onSave={(method) => setCloneMethod(method)}
+        crawlDepth={crawlDepth}
+        onSave={(method, depth) => {
+          setCloneMethod(method);
+          setCrawlDepth(depth);
+        }}
       />
 
       <EstimateDialog

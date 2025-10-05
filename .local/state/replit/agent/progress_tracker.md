@@ -15,3 +15,10 @@
 [x] 12. Display actual ZIP size in status bar
 [x] 13. Add preview functionality for cloned sites
 [x] 14. Enable simultaneous cloning of multiple sites
+
+## New Enhancement Features
+
+[x] 15. Fix playwright progress tracking (stays at 0%, inaccurate time estimates)
+[x] 16. Add fullscreen mode for site preview
+[x] 17. Implement sub-link cloning (crawl and clone related pages)
+[ ] 18. Ensure accurate progress/time/size for both static and playwright methods

@@ -12,7 +12,10 @@ export class PlaywrightService {
     }
   }
 
-  async renderPage(url: string): Promise<{ html: string; resources: string[] }> {
+  async renderPage(
+    url: string, 
+    onProgress?: (progress: number) => void
+  ): Promise<{ html: string; resources: string[] }> {
     await this.initialize();
     if (!this.browser) {
       throw new Error("Browser not initialized");
@@ -20,21 +23,37 @@ export class PlaywrightService {
 
     const page = await this.browser.newPage();
     const resources: string[] = [];
+    let requestCount = 0;
+    let responseCount = 0;
 
     // Track all network requests
     page.on("request", (request) => {
       const resourceType = request.resourceType();
       if (["stylesheet", "script", "image", "font"].includes(resourceType)) {
         resources.push(request.url());
+        requestCount++;
+      }
+    });
+
+    // Track responses to calculate progress
+    page.on("response", () => {
+      responseCount++;
+      if (requestCount > 0 && onProgress) {
+        const progress = Math.min(responseCount / Math.max(requestCount, 1), 0.95);
+        onProgress(progress);
       }
     });
 
     try {
+      onProgress?.(0.1);
+      
       // Navigate and wait for network idle
       await page.goto(url, {
         waitUntil: "networkidle",
         timeout: 60000,
       });
+
+      onProgress?.(1);
 
       // Get the fully rendered HTML
       const html = await page.content();

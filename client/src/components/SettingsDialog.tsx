@@ -10,25 +10,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Zap, Globe } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Zap, Globe, Link2 } from "lucide-react";
 
 interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   cloneMethod: "static" | "playwright";
-  onSave: (method: "static" | "playwright") => void;
+  crawlDepth: number;
+  onSave: (method: "static" | "playwright", crawlDepth: number) => void;
 }
 
 export default function SettingsDialog({
   isOpen,
   onClose,
   cloneMethod,
+  crawlDepth,
   onSave,
 }: SettingsDialogProps) {
   const [selectedMethod, setSelectedMethod] = useState<"static" | "playwright">(cloneMethod);
+  const [selectedDepth, setSelectedDepth] = useState<number>(crawlDepth);
 
   const handleSave = () => {
-    onSave(selectedMethod);
+    onSave(selectedMethod, selectedDepth);
     onClose();
   };
 
@@ -80,6 +84,33 @@ export default function SettingsDialog({
               </div>
             </div>
           </RadioGroup>
+
+          <div className="mt-6 pt-6 border-t">
+            <Label className="flex items-center gap-2 mb-3">
+              <Link2 className="w-4 h-4 text-primary" />
+              <span className="font-semibold">Crawl Sub-Pages</span>
+            </Label>
+            <p className="text-sm text-muted-foreground mb-3">
+              Clone linked pages from the main page (up to 10 sub-pages).
+            </p>
+            <Select 
+              value={selectedDepth.toString()} 
+              onValueChange={(v) => setSelectedDepth(parseInt(v))}
+            >
+              <SelectTrigger data-testid="select-crawl-depth">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0" data-testid="option-depth-0">Single Page Only</SelectItem>
+                <SelectItem value="1" data-testid="option-depth-1">Include Sub-Pages (1 level deep)</SelectItem>
+              </SelectContent>
+            </Select>
+            {selectedDepth > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                ⚠️ This will increase cloning time significantly
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

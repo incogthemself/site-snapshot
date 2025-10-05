@@ -9,6 +9,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, complete, error, paused
   cloneMethod: text("clone_method").notNull().default("playwright"), // static, playwright
+  crawlDepth: integer("crawl_depth").default(0), // 0 = single page, 1+ = crawl sub-pages
   totalFiles: integer("total_files").default(0),
   totalSize: integer("total_size").default(0), // in bytes
   estimatedTime: integer("estimated_time").default(0), // in seconds
@@ -16,6 +17,7 @@ export const projects = pgTable("projects", {
   currentStep: text("current_step"),
   progressPercentage: integer("progress_percentage").default(0),
   filesProcessed: integer("files_processed").default(0),
+  pagesProcessed: integer("pages_processed").default(0),
   isPaused: integer("is_paused").default(0), // 0 = false, 1 = true
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
@@ -36,6 +38,7 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   url: true,
   name: true,
   cloneMethod: true,
+  crawlDepth: true,
 });
 
 export const insertFileSchema = createInsertSchema(files).pick({
