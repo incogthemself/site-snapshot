@@ -98,16 +98,14 @@ export default function Home() {
   }, [currentProject, queryClient]);
 
   // Fetch projects
-  const projectsQuery = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     refetchInterval: (query) => {
       const projects = query.state.data || [];
-      const hasInProgress = projects.some(p => p.status === "processing"); // Changed from "cloning" to "processing"
+      const hasInProgress = projects.some(p => p.status === "processing");
       return hasInProgress ? 2000 : false;
     },
   });
-
-  const { data: projects = [], isLoading: projectsLoading } = projectsQuery;
 
   useEffect(() => {
     if (!projectsLoading && projects.length > 0 && !selectedProjectId) {
