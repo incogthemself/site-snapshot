@@ -8,6 +8,8 @@ interface ProgressModalProps {
     progress: number;
     step: string;
     currentFile?: string;
+    generatedCode?: string;
+    deviceProfile?: string;
   };
   projectId?: string;
   projectStatus?: string;
@@ -113,12 +115,30 @@ export default function ProgressModal({ isOpen, progress, projectId, projectStat
           </div>
 
           {/* Current File */}
-          {progress.currentFile && (
+          {progress.currentFile && !progress.generatedCode && (
             <div className="bg-muted rounded-lg p-3">
               <p className="text-xs text-muted-foreground mb-1">Currently processing:</p>
               <p className="text-sm font-mono text-foreground" data-testid="text-current-file">
                 {progress.currentFile}
               </p>
+            </div>
+          )}
+
+          {/* AI Generated Code Display */}
+          {progress.generatedCode && (
+            <div className="bg-muted rounded-lg p-3 max-h-64 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground">
+                  {progress.deviceProfile ? `Generating code for ${progress.deviceProfile}...` : 'AI generating code...'}
+                </p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+                  <span className="text-xs text-accent">Live</span>
+                </div>
+              </div>
+              <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words" data-testid="text-generated-code">
+                {progress.generatedCode}
+              </pre>
             </div>
           )}
         </div>

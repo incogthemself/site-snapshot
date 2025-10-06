@@ -34,7 +34,7 @@ export default function Home() {
     estimatedSize: number;
     resourceCount: number;
   } | null>(null);
-  const [progressByProject, setProgressByProject] = useState<Map<string, { progress: number; step: string; currentFile: string }>>(new Map());
+  const [progressByProject, setProgressByProject] = useState<Map<string, { progress: number; step: string; currentFile: string; generatedCode?: string; deviceProfile?: string }>>(new Map());
   const [activeClones, setActiveClones] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
@@ -43,8 +43,8 @@ export default function Home() {
 
   // Get progress for current project
   const progress = currentProject
-    ? progressByProject.get(currentProject.id) || { progress: 0, step: "", currentFile: "" }
-    : { progress: 0, step: "", currentFile: "" };
+    ? progressByProject.get(currentProject.id) || { progress: 0, step: "", currentFile: "", generatedCode: "", deviceProfile: "" }
+    : { progress: 0, step: "", currentFile: "", generatedCode: "", deviceProfile: "" };
 
   // WebSocket for progress updates
   useEffect(() => {
@@ -53,12 +53,12 @@ export default function Home() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      const { projectId, progress, step, currentFile } = data;
+      const { projectId, progress, step, currentFile, generatedCode, deviceProfile } = data;
 
       // Update progress for specific project
       setProgressByProject((prev) => {
         const newMap = new Map(prev);
-        newMap.set(projectId, { progress, step, currentFile });
+        newMap.set(projectId, { progress, step, currentFile, generatedCode, deviceProfile });
         return newMap;
       });
 
@@ -142,6 +142,8 @@ export default function Home() {
               progress: updatedProject.progressPercentage || 0,
               step: updatedProject.currentStep || "",
               currentFile: "",
+              generatedCode: updatedProject.generatedCode,
+              deviceProfile: undefined,
             });
             return newMap;
           });
@@ -241,7 +243,7 @@ export default function Home() {
       // Initialize progress for this project
       setProgressByProject((prev) => {
         const newMap = new Map(prev);
-        newMap.set(project.id, { progress: 0, step: "Starting...", currentFile: "" });
+        newMap.set(project.id, { progress: 0, step: "Starting...", currentFile: "", generatedCode: "", deviceProfile: "" });
         return newMap;
       });
 
