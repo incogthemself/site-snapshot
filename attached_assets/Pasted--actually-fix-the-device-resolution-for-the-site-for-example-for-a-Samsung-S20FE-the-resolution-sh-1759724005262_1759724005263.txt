@@ -1,0 +1,11 @@
+- actually fix the device resolution for the site, for example for a Samsung S20FE the resolution should be around 360 x 800 css pixels. Also fit correct resolution on other devices , Adding on, if anything doesn't fit within that 360 x 800 css pixels it shouldn't be a case where you see it in corner but can't see it fully or where it need to swipe horizontally to see the rest, it should be where you would just have to scroll vertically to see anything that may be missing
+- actually fix it so sites can be copied *1:1* either through static files or dynamic
+- each download = a project with a timestamp and a name (and the ability to change name, it has file size in zip
+- A 3rd *main* / *figurehead* mode *best mode* where we actually it is a case where we use an ai model that's able to web scrape, so we use this model of ai to Web scrape from sites and instead of giving you static files or anything that could appear near close enough to the exact site this will actually be 1:1
+- so the ai Web scraper would be able to get 1:1 and I mean 1:1 of the sites using the scraped data of the frontend html, css , js and any links connected to buttons or anything that's hyperlinked. Also the ai should be able to create this code line by line that is 1:1 to the site that give 1:1 results. 
+- the ai Web scraping should be so 1:1 that if the site has a format on a Samsung s23fe and that format is different to a iPhone 15 and that format is different to a pc or tablet the ai will do the code for every device to make sure its seen different format 1:1 like the real site
+- this *main* *best* ai mode should also show you the code being written line by line or section by section, think of it as working the same as replit agent.
+- also the ai even after asking the ai to do the "clone (websitehere)" you can still prompt it to even remove little things or big things while keeping the frontend of the website looking the exact same just with the adjustment of less
+- in theory this ai mode is different from static site or headless browser since in my eyes it is meant to get 1:1 appearance alongside 1:1 linkage that's client side
+- so essentially the ai should be able to get the site correct down to the most minutest details
+- ensure every package or dependency needed for the project to work is installed
