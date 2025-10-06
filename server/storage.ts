@@ -7,6 +7,7 @@ export interface IStorage {
   getProject(id: string): Promise<Project | undefined>;
   getAllProjects(): Promise<Project[]>;
   updateProjectStatus(id: string, status: string, updates?: Partial<Project>): Promise<void>;
+  updateProjectName(id: string, displayName: string): Promise<void>;
   deleteProject(id: string): Promise<void>;
 
   // Files
@@ -31,15 +32,21 @@ export class MemStorage implements IStorage {
     const project: Project = {
       ...insertProject,
       id,
+      displayName: insertProject.displayName || insertProject.name,
       status: "pending",
-      cloneMethod: insertProject.cloneMethod || "playwright",
+      cloneMethod: insertProject.cloneMethod || "static",
+      crawlDepth: insertProject.crawlDepth || 0,
+      deviceProfiles: insertProject.deviceProfiles || null,
       totalFiles: 0,
       totalSize: 0,
+      compressedSize: 0,
       estimatedTime: insertProject.estimatedTime || 0,
       estimatedSize: insertProject.estimatedSize || 0,
       currentStep: null,
       progressPercentage: 0,
       filesProcessed: 0,
+      pagesProcessed: 0,
+      generatedCode: null,
       isPaused: 0,
       createdAt: new Date(),
       completedAt: null,
@@ -72,6 +79,13 @@ export class MemStorage implements IStorage {
         ...updates,
         completedAt: status === "complete" ? new Date() : project.completedAt,
       });
+    }
+  }
+
+  async updateProjectName(id: string, displayName: string): Promise<void> {
+    const project = this.projects.get(id);
+    if (project) {
+      this.projects.set(id, { ...project, displayName });
     }
   }
 

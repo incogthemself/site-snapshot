@@ -2,6 +2,7 @@ import { chromium, type Browser, type Page } from "playwright";
 
 export class PlaywrightService {
   private browser: Browser | null = null;
+  private currentPage: Page | null = null;
 
   async initialize(): Promise<void> {
     if (!this.browser) {
@@ -14,14 +15,23 @@ export class PlaywrightService {
 
   async renderPage(
     url: string, 
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    options?: {
+      viewport?: { width: number; height: number };
+      userAgent?: string;
+    }
   ): Promise<{ html: string; resources: string[] }> {
     await this.initialize();
     if (!this.browser) {
       throw new Error("Browser not initialized");
     }
 
-    const page = await this.browser.newPage();
+    const page = await this.browser.newPage({
+      viewport: options?.viewport,
+      userAgent: options?.userAgent,
+    });
+    this.currentPage = page;
+    
     const resources: string[] = [];
     let requestCount = 0;
     let responseCount = 0;
@@ -60,11 +70,25 @@ export class PlaywrightService {
 
       return { html, resources };
     } finally {
-      await page.close();
+      if (page !== this.currentPage) {
+        await page.close();
+      }
+    }
+  }
+
+  async getPage(): Promise<Page | null> {
+    return this.currentPage;
+  }
+
+  async closePage(): Promise<void> {
+    if (this.currentPage) {
+      await this.currentPage.close();
+      this.currentPage = null;
     }
   }
 
   async close(): Promise<void> {
+    await this.closePage();
     if (this.browser) {
       await this.browser.close();
       this.browser = null;

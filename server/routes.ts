@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { cloneService } from "./services/clone";
+import { aiCloneService } from "./services/aiClone";
 import { fileManager } from "./services/fileManager";
-import { insertProjectSchema } from "@shared/schema";
+import { insertProjectSchema, updateProjectNameSchema } from "@shared/schema";
 import { WebSocketServer } from "ws";
 import archiver from "archiver";
 import path from "path";
@@ -70,14 +71,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertProjectSchema.parse(req.body);
 
-      // Get estimation first
-      const cloneMethod = (data.cloneMethod || "playwright") as "static" | "playwright";
+      const cloneMethod = (data.cloneMethod || "static") as "static" | "playwright" | "ai";
       const crawlDepth = data.crawlDepth || 0;
-      const estimate = await cloneService.estimateClone(
-        data.url,
-        cloneMethod,
-        crawlDepth
-      );
+
+      let estimate = { estimatedTime: 0, estimatedSize: 0, resourceCount: 0 };
+      if (cloneMethod !== "ai") {
+        estimate = await cloneService.estimateClone(
+          data.url,
+          cloneMethod as "static" | "playwright",
+          crawlDepth
+        );
+      } else {
+        const deviceCount = data.deviceProfiles?.length || 1;
+        estimate = {
+          estimatedTime: deviceCount * 30,
+          estimatedSize: 500 * 1024,
+          resourceCount: 10,
+        };
+      }
 
       const project = await storage.createProject({
         ...data,
@@ -85,24 +96,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedSize: estimate.estimatedSize,
       });
 
-      // Start cloning in background
-      cloneService
-        .cloneWebsite(
-          project.id,
-          data.url,
-          (progress, step, currentFile) => {
-            broadcastProgress(project.id, {
-              progress,
-              step,
-              currentFile,
-            });
-          },
-          cloneMethod,
-          data.crawlDepth || 0
-        )
-        .catch((error) => {
-          console.error("Clone error:", error);
-        });
+      // Start cloning in background based on method
+      if (cloneMethod === "ai") {
+        aiCloneService
+          .cloneWithAI(
+            project.id,
+            data.url,
+            data.deviceProfiles || ["desktop"],
+            (progress, step, generatedCode, deviceProfile) => {
+              broadcastProgress(project.id, {
+                progress,
+                step,
+                generatedCode,
+                deviceProfile,
+              });
+            }
+          )
+          .catch((error) => {
+            console.error("AI Clone error:", error);
+          });
+      } else {
+        cloneService
+          .cloneWebsite(
+            project.id,
+            data.url,
+            (progress, step, currentFile) => {
+              broadcastProgress(project.id, {
+                progress,
+                step,
+                currentFile,
+              });
+            },
+            cloneMethod as "static" | "playwright",
+            data.crawlDepth || 0
+          )
+          .catch((error) => {
+            console.error("Clone error:", error);
+          });
+      }
 
       res.json(project);
     } catch (error) {
@@ -123,6 +154,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({
         message: error instanceof Error ? error.message : "Failed to fetch project",
+      });
+    }
+  });
+
+  // Update project name
+  app.patch("/api/projects/:id/name", async (req, res) => {
+    try {
+      const { displayName } = updateProjectNameSchema.parse(req.body);
+      await storage.updateProjectName(req.params.id, displayName);
+      const project = await storage.getProject(req.params.id);
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to update project name",
+      });
+    }
+  });
+
+  // AI Adjustment endpoint
+  app.post("/api/projects/:id/ai-adjust", async (req, res) => {
+    try {
+      const { prompt, deviceProfile } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+      
+      const adjustedCode = await aiCloneService.adjustClonedSite(
+        req.params.id,
+        prompt,
+        deviceProfile || "desktop"
+      );
+      
+      res.json(adjustedCode);
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to adjust clone",
       });
     }
   });
