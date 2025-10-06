@@ -16,9 +16,9 @@ import { Zap, Globe, Link2 } from "lucide-react";
 interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  cloneMethod: "static" | "playwright";
+  cloneMethod: "static" | "playwright" | "ai";
   crawlDepth: number;
-  onSave: (method: "static" | "playwright", crawlDepth: number) => void;
+  onSave: (method: "static" | "playwright" | "ai", crawlDepth: number) => void;
 }
 
 export default function SettingsDialog({
@@ -28,7 +28,7 @@ export default function SettingsDialog({
   crawlDepth,
   onSave,
 }: SettingsDialogProps) {
-  const [selectedMethod, setSelectedMethod] = useState<"static" | "playwright">(cloneMethod);
+  const [selectedMethod, setSelectedMethod] = useState<"static" | "playwright" | "ai">(cloneMethod);
   const [selectedDepth, setSelectedDepth] = useState<number>(crawlDepth);
 
   const handleSave = () => {
@@ -47,7 +47,7 @@ export default function SettingsDialog({
         </DialogHeader>
 
         <div className="py-4">
-          <RadioGroup value={selectedMethod} onValueChange={(v) => setSelectedMethod(v as "static" | "playwright")}>
+          <RadioGroup value={selectedMethod} onValueChange={(v) => setSelectedMethod(v as "static" | "playwright" | "ai")}>
             <div className="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50" onClick={() => setSelectedMethod("static")}>
               <RadioGroupItem value="static" id="static" data-testid="radio-static" />
               <div className="flex-1">

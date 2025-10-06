@@ -28,7 +28,7 @@ interface FileExplorerProps {
   files: ProjectFile[];
   currentProject: Project | null;
   onFileSelect: (file: ProjectFile) => void;
-  onProjectSelect: (project: Project | null) => void;
+  onProjectSelect?: (projectId: string | null) => void;
 }
 
 export default function FileExplorer({

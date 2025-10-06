@@ -26,8 +26,9 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showEstimate, setShowEstimate] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [cloneMethod, setCloneMethod] = useState<"static" | "playwright">("static");
+  const [cloneMethod, setCloneMethod] = useState<"static" | "playwright" | "ai">("static");
   const [crawlDepth, setCrawlDepth] = useState<number>(0);
+  const [deviceProfiles, setDeviceProfiles] = useState<string[]>(["desktop"]);
   const [estimate, setEstimate] = useState<{
     estimatedTime: number;
     estimatedSize: number;
@@ -203,7 +204,15 @@ export default function Home() {
   });
 
   const estimateMutation = useMutation({
-    mutationFn: async (data: { url: string; cloneMethod: string; crawlDepth: number }) => {
+    mutationFn: async (data: { url: string; cloneMethod: string; crawlDepth: number; deviceProfiles?: string[] }) => {
+      if (data.cloneMethod === "ai") {
+        const deviceCount = data.deviceProfiles?.length || 1;
+        return {
+          estimatedTime: deviceCount * 30,
+          estimatedSize: 500 * 1024,
+          resourceCount: 10,
+        };
+      }
       const res = await apiRequest("POST", "/api/estimate", data);
       return res.json();
     },
@@ -221,7 +230,7 @@ export default function Home() {
   });
 
   const createProjectMutation = useMutation({
-    mutationFn: async (data: { url: string; name: string; cloneMethod: string; crawlDepth: number }) => {
+    mutationFn: async (data: { url: string; name: string; displayName?: string; cloneMethod: string; crawlDepth: number; deviceProfiles?: string[] }) => {
       const res = await apiRequest("POST", "/api/projects", data);
       return res.json();
     },
@@ -269,7 +278,7 @@ export default function Home() {
 
     try {
       new URL(url);
-      estimateMutation.mutate({ url, cloneMethod, crawlDepth });
+      estimateMutation.mutate({ url, cloneMethod, crawlDepth, deviceProfiles: cloneMethod === "ai" ? deviceProfiles : undefined });
     } catch {
       toast({
         title: "Error",
@@ -282,8 +291,22 @@ export default function Home() {
   const confirmClone = () => {
     try {
       const urlObj = new URL(url);
-      const name = `${urlObj.hostname}_${new Date().toISOString().split("T")[0]}`;
-      createProjectMutation.mutate({ url, name, cloneMethod, crawlDepth });
+      const timestamp = new Date().toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }).replace(',', '');
+      const name = `${urlObj.hostname}_${timestamp}`;
+      createProjectMutation.mutate({ 
+        url, 
+        name, 
+        displayName: name,
+        cloneMethod, 
+        crawlDepth,
+        deviceProfiles: cloneMethod === "ai" ? deviceProfiles : undefined
+      });
     } catch {
       toast({
         title: "Error",
@@ -333,13 +356,14 @@ export default function Home() {
             />
           </div>
           <div className="flex gap-2">
-            <Select value={cloneMethod} onValueChange={(value: "static" | "playwright") => setCloneMethod(value)}>
+            <Select value={cloneMethod} onValueChange={(value: "static" | "playwright" | "ai") => setCloneMethod(value)}>
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="static">Static Clone</SelectItem>
                 <SelectItem value="playwright">Dynamic Clone</SelectItem>
+                <SelectItem value="ai">AI Mode (Best)</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleClone} disabled={createProjectMutation.isPending} className="flex-1 sm:flex-none" data-testid="button-clone">

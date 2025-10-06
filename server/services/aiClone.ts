@@ -163,14 +163,13 @@ export class AICloneService {
     });
 
     const screenshot = await page.screenshot({
-      encoding: "base64",
       fullPage: true,
     });
 
     return {
       html: result.html,
       computedStyles,
-      screenshot: screenshot as string,
+      screenshot: screenshot.toString("base64"),
       viewport: deviceProfile.viewport,
     };
   }

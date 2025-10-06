@@ -18,7 +18,7 @@ interface EstimateDialogProps {
     estimatedSize: number;
     resourceCount: number;
   } | null;
-  cloneMethod: "static" | "playwright";
+  cloneMethod: "static" | "playwright" | "ai";
 }
 
 export default function EstimateDialog({
