@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack web application that clones websites by downloading all their resources (HTML, CSS, JavaScript, images, fonts) and making them available for local viewing and editing. The application uses Playwright for headless browser rendering to capture fully-rendered pages including JavaScript-generated content, then packages everything into a downloadable archive.
+This is a full-stack web application that clones websites with three powerful modes: static HTML capture, dynamic Playwright-based rendering, and AI-powered code generation. The AI mode uses GPT-5 to create pixel-perfect responsive clones for multiple device profiles with real-time code streaming.
 
 ## User Preferences
 
@@ -10,16 +10,36 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Enhancements (October 2025)
 
+### AI-Powered Cloning Mode (NEW)
+- **AI Mode (Best)**: Uses OpenAI GPT-5 to generate truly 1:1 responsive code
+- Multi-device profile support:
+  - Samsung S20FE (360x800px)
+  - Samsung S23FE (360x780px)
+  - iPhone (390x844px)
+  - iPad (820x1180px)
+  - Desktop (1920x1080px)
+- Real-time code streaming with live display
+- AI adjustment prompts to modify clones while maintaining visual fidelity
+- Screenshot-based analysis for pixel-perfect recreation
+
 ### Clone Method Selection
-- **Static Mirror Mode (Default)**: Fast cloning using Cheerio without headless browser - 2-3x faster than Playwright mode
-- **Dynamic Clone Mode (Playwright)**: Headless browser rendering for JavaScript-heavy sites that require execution
+- **Static Mirror Mode**: Fast cloning using Cheerio without headless browser - 2-3x faster
+- **Dynamic Clone Mode (Playwright)**: Headless browser rendering for JavaScript-heavy sites
+- **AI Mode (Best)**: GPT-5 powered responsive code generation with device profiles
+
+### Real-Time Code Display
+- Live code generation shown in progress modal
+- Syntax-highlighted code display
+- Device profile indicator
+- Streaming updates with "Live" indicator
+- Auto-scrolling code viewer
 
 ### Estimation System
 - Pre-clone estimation shows:
   - Estimated time to complete (in seconds/minutes)
   - Estimated ZIP file size (in KB/MB)
   - Number of resources to download
-- Estimation runs before starting the clone, giving users informed choices
+- Estimation runs before starting the clone
 
 ### Concurrent Cloning
 - Multiple sites can be cloned simultaneously
@@ -35,7 +55,7 @@ Preferred communication style: Simple, everyday language.
 - Static file serving from cloned site directory
 
 ### User Interface
-- Settings dialog to choose between static/dynamic cloning modes
+- Settings dialog to choose between static/dynamic/AI cloning modes
 - Estimate dialog shows predictions before cloning starts
 - Preview button appears when a project is complete
 - Real-time progress tracking with step-by-step updates
@@ -61,6 +81,7 @@ Preferred communication style: Simple, everyday language.
 - React Query handles all server state with configured options for refetching behavior
 - Local component state using React hooks
 - WebSocket for bidirectional communication to receive cloning progress updates
+- Progress state includes generatedCode and deviceProfile for AI streaming
 
 **Key Features**
 - File explorer with tree structure navigation
@@ -68,6 +89,7 @@ Preferred communication style: Simple, everyday language.
 - Live preview iframe showing rendered HTML
 - Responsive viewport modes (mobile, tablet, desktop)
 - Real-time progress modal during website cloning with pause/resume controls
+- AI code generation display with streaming support
 - Background downloading with progress persistence across page refreshes
 - Success modal with download functionality
 - Automatic progress recovery when returning to the application
@@ -90,15 +112,22 @@ Preferred communication style: Simple, everyday language.
    - Reports progress through callback mechanism
    - Persists progress after each major step to storage
    - Supports pause/resume functionality
-   - Checks for pause status before processing each file
 
-2. **Playwright Service** (`server/services/playwright.ts`)
+2. **AI Clone Service** (`server/services/aiClone.ts`)
+   - Uses OpenAI GPT-5 for intelligent code generation
+   - Captures screenshots of target website for visual analysis
+   - Generates device-specific responsive code
+   - Streams code generation progress via WebSocket
+   - Supports post-clone AI adjustments
+   - Creates pixel-perfect recreations using visual analysis
+
+3. **Playwright Service** (`server/services/playwright.ts`)
    - Manages headless Chromium browser instance
    - Renders pages with full JavaScript execution
    - Tracks network requests to identify all resources
    - Waits for network idle before capturing HTML
 
-3. **File Manager Service** (`server/services/fileManager.ts`)
+4. **File Manager Service** (`server/services/fileManager.ts`)
    - Manages project directory structure on filesystem
    - Handles file I/O operations (save, read, list)
    - Generates local file paths from URLs
@@ -107,10 +136,12 @@ Preferred communication style: Simple, everyday language.
 **API Architecture**
 - RESTful endpoints under `/api` prefix
 - WebSocket endpoint at `/ws` for progress streaming
+- AI cloning endpoint: `POST /api/clone/ai`
+- AI adjustment endpoint: `POST /api/projects/:id/adjust`
+- Project name update: `PATCH /api/projects/:id/name`
 - Request/response logging middleware
 - JSON body parsing with raw body preservation
 - Pause/Resume API endpoints: `POST /api/projects/:id/pause` and `POST /api/projects/:id/resume`
-- Background cloning runs independently of client connection
 
 **Data Storage**
 - In-memory storage implementation (`MemStorage`) using Map data structures
@@ -137,13 +168,18 @@ projects:
   - id (UUID primary key)
   - url (text)
   - name (text)
+  - displayName (text) - editable project display name
+  - cloneMethod (static/playwright/ai)
+  - deviceProfiles (text array) - for AI mode
+  - generatedCode (text) - AI-generated code
+  - compressedSize (integer) - ZIP file size
   - status (pending/processing/complete/error/paused)
   - totalFiles (integer)
   - totalSize (integer, bytes)
-  - currentStep (text, nullable) - current cloning step
-  - progressPercentage (integer) - 0-100 completion percentage
-  - filesProcessed (integer) - number of files processed so far
-  - isPaused (integer) - 0 = false, 1 = true
+  - currentStep (text, nullable)
+  - progressPercentage (integer)
+  - filesProcessed (integer)
+  - isPaused (integer)
   - createdAt (timestamp)
   - completedAt (timestamp, nullable)
   - errorMessage (text, nullable)
@@ -166,10 +202,17 @@ Currently, the application has no authentication or authorization mechanisms. Al
 
 ### Third-Party Services
 
+**OpenAI**
+- GPT-5 model for AI-powered code generation
+- Visual analysis of website screenshots
+- Streaming API for real-time code generation
+- Configured via OPENAI_API_KEY environment variable
+
 **Playwright**
 - Headless browser automation for rendering JavaScript-heavy websites
 - Uses Chromium browser with sandboxing disabled for compatibility
 - Provides network request tracking and page content extraction
+- Screenshot capture for AI mode
 
 ### APIs and Libraries
 
@@ -185,6 +228,7 @@ Currently, the application has no authentication or authorization mechanisms. Al
 - Cheerio: Fast HTML parsing and manipulation
 - Archiver: ZIP file creation for downloads
 - Playwright: Browser automation
+- OpenAI SDK: AI code generation
 
 ### Database
 
@@ -210,6 +254,69 @@ Currently, the application has no authentication or authorization mechanisms. Al
 ### Environment Configuration
 
 Required environment variables:
+- `OPENAI_API_KEY`: OpenAI API key for AI cloning mode
 - `DATABASE_URL`: PostgreSQL connection string (for future database use)
 - `NODE_ENV`: Set to "development" or "production"
 - `REPL_ID`: Replit-specific identifier (optional, for development plugins)
+
+## Mobile Responsiveness
+
+The application is fully responsive with specific optimizations for mobile devices:
+
+### Target Devices
+- Samsung S20FE: 360x800px (primary mobile target)
+- Samsung S23FE: 360x780px
+- iPhone: 390x844px
+- iPad: 820x1180px
+
+### Mobile Optimizations
+- No horizontal scrolling on any device
+- Touch-friendly minimum tap targets (44px)
+- Responsive breakpoints at 640px, 768px, 1024px
+- Optimized layouts for portrait and landscape orientations
+- Mobile-first CSS approach
+
+### CSS Breakpoints
+- Mobile: 360px-639px
+- Tablet: 640px-1023px
+- Desktop: 1024px+
+
+## Project Structure
+
+```
+client/               # Frontend React application
+  src/
+    components/       # Reusable UI components
+      ProgressModal.tsx  # Progress display with AI code streaming
+    pages/            # Page components
+      home.tsx        # Main application page
+    lib/              # Utility libraries
+    index.css         # Global styles and theme
+
+server/               # Backend Express application
+  services/
+    clone.ts          # Static/Playwright cloning service
+    aiClone.ts        # AI-powered cloning service
+    playwright.ts     # Browser automation service
+    fileManager.ts    # File system operations
+  routes.ts           # API endpoints
+  storage.ts          # Data storage interface
+  index.ts            # Server entry point
+
+shared/               # Shared types and schemas
+  schema.ts           # Database schema and types
+
+cloned_sites/         # Cloned website storage directory
+```
+
+## Future Enhancements
+
+### Pending Features
+- Project name editing in UI
+- Enhanced static/playwright cloning with inline styles and @import support
+- Database migration from in-memory to PostgreSQL
+- User authentication and authorization
+- Project sharing and collaboration
+- Version control for cloned sites
+- Advanced AI adjustment prompts UI
+- Export to various frameworks (React, Vue, etc.)
