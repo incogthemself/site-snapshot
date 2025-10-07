@@ -11,10 +11,9 @@ import SuccessModal from "@/components/SuccessModal";
 import SettingsDialog from "@/components/SettingsDialog";
 import EstimateDialog from "@/components/EstimateDialog";
 import SitePreview from "@/components/SitePreview";
-import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor, Eye, Zap, Loader2 } from "lucide-react";
+import { Globe, Download, Settings, HelpCircle, FileCode, Code, Monitor, Eye, Zap, Loader2, Edit2, Check, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -38,7 +37,9 @@ export default function Home() {
   const [activeClones, setActiveClones] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null); // State to keep track of the selected project ID
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [newProjectName, setNewProjectName] = useState("");
 
 
   // Get progress for current project
@@ -231,6 +232,30 @@ export default function Home() {
     },
   });
 
+  const renameProjectMutation = useMutation({
+    mutationFn: async ({ projectId, displayName }: { projectId: string; displayName: string }) => {
+      const res = await apiRequest("PATCH", `/api/projects/${projectId}/name`, { displayName });
+      return res.json();
+    },
+    onSuccess: (updatedProject: Project) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", updatedProject.id] });
+      setRenamingProjectId(null);
+      setNewProjectName("");
+      toast({
+        title: "Project Renamed",
+        description: `Project renamed to "${updatedProject.displayName || updatedProject.name}"`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Rename Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createProjectMutation = useMutation({
     mutationFn: async (data: { url: string; name: string; displayName?: string; cloneMethod: string; crawlDepth: number; deviceProfiles?: string[] }) => {
       const res = await apiRequest("POST", "/api/projects", data);
@@ -358,16 +383,6 @@ export default function Home() {
             />
           </div>
           <div className="flex gap-2">
-            <Select value={cloneMethod} onValueChange={(value: "static" | "playwright" | "ai") => setCloneMethod(value)}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="static">Static Clone</SelectItem>
-                <SelectItem value="playwright">Dynamic Clone</SelectItem>
-                <SelectItem value="ai">AI Mode (Best)</SelectItem>
-              </SelectContent>
-            </Select>
             <Button onClick={handleClone} disabled={createProjectMutation.isPending} className="flex-1 sm:flex-none" data-testid="button-clone">
               <Download className="w-4 h-4" />
               <span className="ml-2">Clone Site</span>
@@ -414,27 +429,82 @@ export default function Home() {
           {projects.map((project) => (
             <div
               key={project.id}
-              className={`p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
-                selectedProjectId === project.id // Use selectedProjectId for highlighting
+              className={`group p-2 sm:p-3 rounded-lg border transition-colors ${
+                selectedProjectId === project.id
                   ? "border-primary bg-primary/10"
                   : "border-border hover:border-primary/50"
               }`}
-              onClick={() => {
-                setSelectedProjectId(project.id); // Set selected project ID
-                setSelectedFile(null); // Deselect file when project changes
-                if (isMobileView) {
-                  // On mobile, navigate to the workspace view
-                  // This would typically involve routing or a state change to show the workspace
-                  // For simplicity here, we'll assume the Tabs component handles this
-                }
-              }}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm sm:text-base font-medium truncate">{project.name}</h3>
+                <div 
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => {
+                    if (renamingProjectId !== project.id) {
+                      setSelectedProjectId(project.id);
+                      setSelectedFile(null);
+                    }
+                  }}
+                >
+                  {renamingProjectId === project.id ? (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        className="h-7 text-sm"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            renameProjectMutation.mutate({ projectId: project.id, displayName: newProjectName });
+                          } else if (e.key === "Escape") {
+                            setRenamingProjectId(null);
+                            setNewProjectName("");
+                          }
+                        }}
+                        data-testid="input-rename-project"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => renameProjectMutation.mutate({ projectId: project.id, displayName: newProjectName })}
+                        data-testid="button-confirm-rename"
+                      >
+                        <Check className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setRenamingProjectId(null);
+                          setNewProjectName("");
+                        }}
+                        data-testid="button-cancel-rename"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm sm:text-base font-medium truncate flex-1">{project.displayName || project.name}</h3>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenamingProjectId(project.id);
+                          setNewProjectName(project.displayName || project.name);
+                        }}
+                        data-testid={`button-rename-${project.id}`}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground truncate mt-1">{project.url}</p>
                 </div>
-                <div className="flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {project.status === "processing" && (
                     <Loader2 className="w-4 h-4 animate-spin text-primary" />
                   )}
@@ -442,7 +512,7 @@ export default function Home() {
                     <HelpCircle className="w-4 h-4 text-yellow-500" />
                   )}
                   {project.status === "complete" && (
-                    <Eye className="w-4 h-4 text-green-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); setCurrentProject(project); setShowPreview(true); }} />
+                    <Eye className="w-4 h-4 text-green-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); setCurrentProject(project); setShowPreview(true); }} data-testid={`button-preview-${project.id}`} />
                   )}
                   {project.status === "error" && (
                     <Zap className="w-4 h-4 text-red-500" />
@@ -565,9 +635,11 @@ export default function Home() {
         onClose={() => setShowSettings(false)}
         cloneMethod={cloneMethod}
         crawlDepth={crawlDepth}
-        onSave={(method, depth) => {
+        deviceProfiles={deviceProfiles}
+        onSave={(method, depth, profiles) => {
           setCloneMethod(method);
           setCrawlDepth(depth);
+          setDeviceProfiles(profiles);
         }}
       />
 

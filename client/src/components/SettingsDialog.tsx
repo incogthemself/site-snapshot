@@ -11,14 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Zap, Globe, Link2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Zap, Globe, Link2, Sparkles } from "lucide-react";
+import { deviceProfiles } from "@shared/schema";
 
 interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   cloneMethod: "static" | "playwright" | "ai";
   crawlDepth: number;
-  onSave: (method: "static" | "playwright" | "ai", crawlDepth: number) => void;
+  deviceProfiles: string[];
+  onSave: (method: "static" | "playwright" | "ai", crawlDepth: number, deviceProfiles: string[]) => void;
 }
 
 export default function SettingsDialog({
@@ -26,14 +29,25 @@ export default function SettingsDialog({
   onClose,
   cloneMethod,
   crawlDepth,
+  deviceProfiles: initialDeviceProfiles,
   onSave,
 }: SettingsDialogProps) {
   const [selectedMethod, setSelectedMethod] = useState<"static" | "playwright" | "ai">(cloneMethod);
   const [selectedDepth, setSelectedDepth] = useState<number>(crawlDepth);
+  const [selectedDeviceProfiles, setSelectedDeviceProfiles] = useState<string[]>(initialDeviceProfiles.length > 0 ? initialDeviceProfiles : ["desktop"]);
 
   const handleSave = () => {
-    onSave(selectedMethod, selectedDepth);
+    onSave(selectedMethod, selectedDepth, selectedDeviceProfiles);
     onClose();
+  };
+
+  const toggleDeviceProfile = (profileId: string) => {
+    setSelectedDeviceProfiles(prev => {
+      if (prev.includes(profileId)) {
+        return prev.filter(id => id !== profileId);
+      }
+      return [...prev, profileId];
+    });
   };
 
   return (
@@ -83,7 +97,60 @@ export default function SettingsDialog({
                 </div>
               </div>
             </div>
+
+            <div className="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 mt-3" onClick={() => setSelectedMethod("ai")}>
+              <RadioGroupItem value="ai" id="ai" data-testid="radio-ai" />
+              <div className="flex-1">
+                <Label htmlFor="ai" className="flex items-center gap-2 cursor-pointer">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-semibold">AI Mode (Best Quality)</span>
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Uses AI to create a pixel-perfect 1:1 recreation. Captures exact visual appearance and styling for selected devices.
+                </p>
+                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                  <span>✨ Pixel-perfect copy</span>
+                  <span>📱 Multi-device support</span>
+                  <span>🎨 Exact styling</span>
+                </div>
+              </div>
+            </div>
           </RadioGroup>
+
+          {selectedMethod === "ai" && (
+            <div className="mt-6 pt-6 border-t">
+              <Label className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="font-semibold">Select Device Profiles</span>
+              </Label>
+              <p className="text-sm text-muted-foreground mb-3">
+                Choose which devices to optimize the clone for (at least one required).
+              </p>
+              <div className="space-y-2">
+                {deviceProfiles.map((profile) => (
+                  <div key={profile.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`device-${profile.id}`}
+                      checked={selectedDeviceProfiles.includes(profile.id)}
+                      onCheckedChange={() => toggleDeviceProfile(profile.id)}
+                      data-testid={`checkbox-device-${profile.id}`}
+                    />
+                    <Label
+                      htmlFor={`device-${profile.id}`}
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      {profile.name} ({profile.viewport.width}×{profile.viewport.height}px)
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedDeviceProfiles.length === 0 && (
+                <p className="text-xs text-destructive mt-2">
+                  ⚠️ Please select at least one device profile
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="mt-6 pt-6 border-t">
             <Label className="flex items-center gap-2 mb-3">

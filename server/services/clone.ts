@@ -118,6 +118,24 @@ export class CloneService {
         }
       });
 
+      // Collect fonts
+      const fontLinks = new Set<string>();
+      $('link[rel*="font"], link[type*="font"]').each((_, el) => {
+        const href = $(el).attr("href");
+        if (href) {
+          fontLinks.add(href);
+        }
+      });
+
+      // Collect favicons and icons
+      const icons = new Set<string>();
+      $('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => {
+        const href = $(el).attr("href");
+        if (href && !href.startsWith("data:")) {
+          icons.add(href);
+        }
+      });
+
       const jsScripts = new Set<string>();
       $("script[src]").each((_, el) => {
         const src = $(el).attr("src");
@@ -134,17 +152,126 @@ export class CloneService {
         }
       });
 
-      const totalResources = cssLinks.size + jsScripts.size + images.size;
+      // Collect background images from inline styles
+      $("[style*='background']").each((_, el) => {
+        const style = $(el).attr("style");
+        if (style) {
+          const urlMatches = style.match(/url\(['"]?([^'")\s]+)['"]?\)/g);
+          if (urlMatches) {
+            urlMatches.forEach(match => {
+              const url = match.replace(/url\(['"]?([^'")\s]+)['"]?\)/, '$1');
+              if (url && !url.startsWith("data:")) {
+                images.add(url);
+              }
+            });
+          }
+        }
+      });
+
+      const totalResources = cssLinks.size + jsScripts.size + images.size + fontLinks.size + icons.size;
       let downloadedCount = 0;
 
-      // Calculate progress ranges: 15-30 for CSS, 30-55 for JS, 55-85 for images
+      // Calculate progress ranges
       const baseProgress = method === "playwright" ? 15 : 20;
       
+      // Download fonts
+      if (fontLinks.size > 0) {
+        onProgress?.(baseProgress, "Downloading fonts");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Downloading fonts",
+          progressPercentage: baseProgress,
+        });
+      }
+
+      for (const href of Array.from(fontLinks)) {
+        const project = await storage.getProject(projectId);
+        if (project?.isPaused === 1) {
+          await storage.updateProjectStatus(projectId, "paused");
+          return;
+        }
+
+        try {
+          const absoluteUrl = new URL(href, url).href;
+          const content = await this.fetchResource(absoluteUrl);
+          const localPath = fileManager.getLocalPath(href, url);
+
+          await fileManager.saveFile(projectId, `fonts/${localPath}`, content);
+          await storage.createFile({
+            projectId,
+            path: `fonts/${localPath}`,
+            content: "",
+            type: "font",
+            size: content.length,
+          });
+
+          $(`link[href="${href}"]`).attr("href", `./fonts/${localPath}`);
+
+          downloadedCount++;
+          const progressPercentage = Math.floor(baseProgress + (downloadedCount / totalResources) * 5);
+          onProgress?.(progressPercentage, "Downloading fonts", localPath);
+          await storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Downloading fonts",
+            progressPercentage,
+            filesProcessed: downloadedCount,
+          });
+        } catch (error) {
+          console.error(`Failed to download font: ${href}`, error);
+        }
+      }
+
+      // Download icons
+      const iconProgress = baseProgress + 5;
+      if (icons.size > 0) {
+        onProgress?.(iconProgress, "Downloading icons");
+        await storage.updateProjectStatus(projectId, "processing", {
+          currentStep: "Downloading icons",
+          progressPercentage: iconProgress,
+        });
+      }
+
+      for (const href of Array.from(icons)) {
+        const project = await storage.getProject(projectId);
+        if (project?.isPaused === 1) {
+          await storage.updateProjectStatus(projectId, "paused");
+          return;
+        }
+
+        try {
+          const absoluteUrl = new URL(href, url).href;
+          const content = await this.fetchResource(absoluteUrl);
+          const localPath = fileManager.getLocalPath(href, url);
+
+          await fileManager.saveFile(projectId, `icons/${localPath}`, content);
+          await storage.createFile({
+            projectId,
+            path: `icons/${localPath}`,
+            content: "",
+            type: "image",
+            size: content.length,
+          });
+
+          $(`link[href="${href}"]`).attr("href", `./icons/${localPath}`);
+
+          downloadedCount++;
+          const progressPercentage = Math.floor(baseProgress + 5 + (downloadedCount / totalResources) * 5);
+          onProgress?.(progressPercentage, "Downloading icons", localPath);
+          await storage.updateProjectStatus(projectId, "processing", {
+            currentStep: "Downloading icons",
+            progressPercentage,
+            filesProcessed: downloadedCount,
+          });
+        } catch (error) {
+          console.error(`Failed to download icon: ${href}`, error);
+        }
+      }
+      
+      // Download CSS files
+      const cssProgress = baseProgress + 10;
       if (cssLinks.size > 0) {
-        onProgress?.(baseProgress, "Downloading CSS files");
+        onProgress?.(cssProgress, "Downloading CSS files");
         await storage.updateProjectStatus(projectId, "processing", {
           currentStep: "Downloading CSS files",
-          progressPercentage: baseProgress,
+          progressPercentage: cssProgress,
         });
       }
       
@@ -174,7 +301,7 @@ export class CloneService {
           $(`link[href="${href}"]`).attr("href", `./css/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(baseProgress + (downloadedCount / totalResources) * 15);
+          const progressPercentage = Math.floor(cssProgress + (downloadedCount / totalResources) * 15);
           onProgress?.(progressPercentage, "Downloading CSS files", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading CSS files",
@@ -187,7 +314,7 @@ export class CloneService {
       }
 
       // Download JavaScript files
-      const jsProgress = baseProgress + 15;
+      const jsProgress = cssProgress + 15;
       if (jsScripts.size > 0) {
         onProgress?.(jsProgress, "Downloading JavaScript files");
         await storage.updateProjectStatus(projectId, "processing", {
@@ -222,7 +349,7 @@ export class CloneService {
           $(`script[src="${src}"]`).attr("src", `./js/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(baseProgress + 15 + (downloadedCount / totalResources) * 25);
+          const progressPercentage = Math.floor(jsProgress + (downloadedCount / totalResources) * 20);
           onProgress?.(progressPercentage, "Downloading JavaScript files", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading JavaScript files",
@@ -235,7 +362,7 @@ export class CloneService {
       }
 
       // Download images
-      const imgProgress = baseProgress + 40;
+      const imgProgress = jsProgress + 20;
       if (images.size > 0) {
         onProgress?.(imgProgress, "Downloading images");
         await storage.updateProjectStatus(projectId, "processing", {
@@ -270,7 +397,7 @@ export class CloneService {
           $(`img[src="${src}"]`).attr("src", `./images/${localPath}`);
 
           downloadedCount++;
-          const progressPercentage = Math.floor(baseProgress + 40 + (downloadedCount / totalResources) * 30);
+          const progressPercentage = Math.floor(imgProgress + (downloadedCount / totalResources) * 25);
           onProgress?.(progressPercentage, "Downloading images", localPath);
           await storage.updateProjectStatus(projectId, "processing", {
             currentStep: "Downloading images",
