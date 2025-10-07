@@ -10,7 +10,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Enhancements (October 2025)
 
-### AI-Powered Cloning Mode (NEW)
+### Latest Updates (October 7, 2025)
+- **Mobile-First Responsive Design**: Enhanced viewport settings with proper scaling (max-scale 5.0) and mobile-specific meta tags for better user experience
+- **Streamlined UI**: Removed dropdown selector, all cloning modes now accessible through unified settings dialog
+- **Enhanced Cloning Accuracy**: 
+  - Captures fonts from link tags for typography preservation
+  - Downloads favicons and app icons for complete branding
+  - Extracts background images from inline styles for pixel-perfect layouts
+  - Improved resource discovery for 1:1 website replication
+- **Project Management**: Inline project renaming with edit/confirm/cancel controls, hover-to-show edit button
+- **Settings Dialog Enhancement**: Unified interface for all three cloning modes (Static, Playwright, AI) with device profile selection for AI mode
+
+### AI-Powered Cloning Mode
 - **AI Mode (Best)**: Uses OpenAI GPT-5 to generate truly 1:1 responsive code
 - Multi-device profile support:
   - Samsung S20FE (360x800px)
@@ -23,9 +34,9 @@ Preferred communication style: Simple, everyday language.
 - Screenshot-based analysis for pixel-perfect recreation
 
 ### Clone Method Selection
-- **Static Mirror Mode**: Fast cloning using Cheerio without headless browser - 2-3x faster
-- **Dynamic Clone Mode (Playwright)**: Headless browser rendering for JavaScript-heavy sites
-- **AI Mode (Best)**: GPT-5 powered responsive code generation with device profiles
+- **Static Mirror Mode**: Fast cloning using Cheerio without headless browser - 2-3x faster, now captures fonts, icons, and background images
+- **Dynamic Clone Mode (Playwright)**: Headless browser rendering for JavaScript-heavy sites with enhanced resource discovery
+- **AI Mode (Best)**: GPT-5 powered responsive code generation with device profiles for pixel-perfect recreation
 
 ### Real-Time Code Display
 - Live code generation shown in progress modal

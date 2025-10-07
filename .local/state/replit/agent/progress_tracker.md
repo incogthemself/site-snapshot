@@ -22,3 +22,11 @@
 [x] 16. Add fullscreen mode for site preview
 [x] 17. Implement sub-link cloning (crawl and clone related pages)
 [x] 18. Ensure accurate progress/time/size for both static and playwright methods
+
+## Latest Enhancements (October 7, 2025)
+
+[x] 19. Enhanced mobile responsiveness with improved viewport settings and meta tags
+[x] 20. Removed dropdown menu and integrated AI mode into unified settings dialog
+[x] 21. Improved cloning accuracy - now captures fonts, icons, and background images
+[x] 22. Added inline project renaming with edit/confirm/cancel controls
+[x] 23. Verified all dependencies are properly installed
