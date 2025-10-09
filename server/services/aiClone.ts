@@ -4,8 +4,20 @@ import { fileManager } from "./fileManager";
 import { storage } from "../storage";
 import { deviceProfiles, type DeviceProfile } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy initialization of OpenAI client to avoid startup errors when API key is missing
+let openaiInstance: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiInstance) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OpenAI API key is not configured. Please set OPENAI_API_KEY in your environment variables.");
+    }
+    // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+    openaiInstance = new OpenAI({ apiKey });
+  }
+  return openaiInstance;
+}
 
 interface AICloneCallback {
   (progress: number, step: string, generatedCode?: string, deviceProfile?: string): void;
