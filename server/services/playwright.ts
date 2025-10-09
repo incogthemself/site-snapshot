@@ -6,10 +6,28 @@ export class PlaywrightService {
 
   async initialize(): Promise<void> {
     if (!this.browser) {
-      this.browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
+      try {
+        this.browser = await chromium.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Check if it's a browser binary missing error
+        if (errorMessage.includes("Executable doesn't exist") || 
+            errorMessage.includes("browser binaries") ||
+            errorMessage.includes("browserType.launch")) {
+          throw new Error(
+            "Playwright browser binaries are not installed. " +
+            "Please run 'npx playwright install chromium' to install the required browser. " +
+            "Original error: " + errorMessage
+          );
+        }
+        
+        // Re-throw other errors
+        throw error;
+      }
     }
   }
 

@@ -230,6 +230,7 @@ Respond with a JSON object containing:
   "js": "complete JavaScript code (if needed)"
 }`;
 
+    const openai = getOpenAIClient();
     const stream = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -368,6 +369,7 @@ Respond with a JSON object containing the updated code:
   "js": "updated JavaScript code"
 }`;
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
