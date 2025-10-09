@@ -30,3 +30,12 @@
 [x] 21. Improved cloning accuracy - now captures fonts, icons, and background images
 [x] 22. Added inline project renaming with edit/confirm/cancel controls
 [x] 23. Verified all dependencies are properly installed
+
+## Critical Fixes (October 9, 2025)
+
+[x] 24. Fixed Playwright browser binary installation - installed Chromium with headless shell
+[x] 25. Installed all required system dependencies (libXdamage, libgbm, mesa, nss, etc.) via Nix
+[x] 26. Fixed OpenAI initialization to be lazy - prevents startup crashes when API key is missing
+[x] 27. Added graceful error handling for Playwright browser installation errors
+[x] 28. Verified Playwright browser launches successfully with all dependencies
+[x] 29. Application now starts and runs without errors on port 5000
