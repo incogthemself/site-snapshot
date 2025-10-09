@@ -170,6 +170,12 @@ export class CloneService {
 
       const totalResources = cssLinks.size + jsScripts.size + images.size + fontLinks.size + icons.size;
       let downloadedCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      // Clear CSS visited set and path mapping for this clone session
+      this.cssVisited.clear();
+      this.cssUrlToLocalPath.clear();
 
       // Calculate progress ranges
       const baseProgress = method === "playwright" ? 15 : 20;
@@ -215,6 +221,9 @@ export class CloneService {
             filesProcessed: downloadedCount,
           });
         } catch (error) {
+          failedCount++;
+          const errorMsg = `Font: ${href} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMsg);
           console.error(`Failed to download font: ${href}`, error);
         }
       }
@@ -261,6 +270,9 @@ export class CloneService {
             filesProcessed: downloadedCount,
           });
         } catch (error) {
+          failedCount++;
+          const errorMsg = `Icon: ${href} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMsg);
           console.error(`Failed to download icon: ${href}`, error);
         }
       }
@@ -288,14 +300,29 @@ export class CloneService {
           const content = await this.fetchResource(absoluteUrl);
           const localPath = fileManager.getLocalPath(href, url);
 
-          await fileManager.saveFile(projectId, `css/${localPath}`, content);
-          await storage.createFile({
+          const failedCountObj = { count: 0 };
+          const processedCSS = await this.processCSS(
             projectId,
-            path: `css/${localPath}`,
-            content: content.toString(),
-            type: "css",
-            size: content.length,
-          });
+            content.toString(),
+            absoluteUrl,
+            localPath,
+            url,
+            failedCountObj,
+            errors
+          );
+          failedCount += failedCountObj.count;
+
+          // Only save if processedCSS is not empty (not already saved by earlier processing)
+          if (processedCSS) {
+            await fileManager.saveFile(projectId, `css/${localPath}`, Buffer.from(processedCSS));
+            await storage.createFile({
+              projectId,
+              path: `css/${localPath}`,
+              content: processedCSS,
+              type: "css",
+              size: processedCSS.length,
+            });
+          }
 
           // Update link in HTML
           $(`link[href="${href}"]`).attr("href", `./css/${localPath}`);
@@ -309,6 +336,9 @@ export class CloneService {
             filesProcessed: downloadedCount,
           });
         } catch (error) {
+          failedCount++;
+          const errorMsg = `CSS: ${href} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMsg);
           console.error(`Failed to download CSS: ${href}`, error);
         }
       }
@@ -357,6 +387,9 @@ export class CloneService {
             filesProcessed: downloadedCount,
           });
         } catch (error) {
+          failedCount++;
+          const errorMsg = `JavaScript: ${src} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMsg);
           console.error(`Failed to download JS: ${src}`, error);
         }
       }
@@ -405,14 +438,51 @@ export class CloneService {
             filesProcessed: downloadedCount,
           });
         } catch (error) {
+          failedCount++;
+          const errorMsg = `Image: ${src} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMsg);
           console.error(`Failed to download image: ${src}`, error);
         }
       }
 
-      // Rewrite all absolute URLs to relative
-      onProgress?.(90, "Rewriting URLs");
+      // Rewrite inline style background-image URLs
+      onProgress?.(88, "Rewriting inline styles");
       await storage.updateProjectStatus(projectId, "processing", {
-        currentStep: "Rewriting URLs",
+        currentStep: "Rewriting inline styles",
+        progressPercentage: 88,
+      });
+
+      $("[style*='background']").each((_, el) => {
+        const style = $(el).attr("style");
+        if (style) {
+          let updatedStyle = style;
+          const urlMatches = style.match(/url\(['"]?([^'")\s]+)['"]?\)/g);
+          if (urlMatches) {
+            urlMatches.forEach(match => {
+              const originalUrl = match.replace(/url\(['"]?([^'")\s]+)['"]?\)/, '$1');
+              if (originalUrl && !originalUrl.startsWith("data:")) {
+                try {
+                  const absoluteUrl = new URL(originalUrl, url).href;
+                  const localPath = fileManager.getLocalPath(originalUrl, url);
+                  const newUrl = `./images/${localPath}`;
+                  updatedStyle = updatedStyle.replace(
+                    new RegExp(originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                    newUrl
+                  );
+                } catch (error) {
+                  console.error(`Failed to rewrite inline style URL: ${originalUrl}`, error);
+                }
+              }
+            });
+          }
+          $(el).attr("style", updatedStyle);
+        }
+      });
+
+      // Rewrite all absolute URLs to relative
+      onProgress?.(90, "Finalizing HTML");
+      await storage.updateProjectStatus(projectId, "processing", {
+        currentStep: "Finalizing HTML",
         progressPercentage: 90,
       });
       const updatedHtml = $.html();
@@ -472,14 +542,24 @@ export class CloneService {
       const allFiles = await storage.getFilesByProject(projectId);
       const totalSize = allFiles.reduce((sum, file) => sum + (file.size || 0), 0);
 
+      const successRate = totalResources > 0 
+        ? Math.round((downloadedCount / totalResources) * 100) 
+        : 100;
+      
+      let completionMessage = `Clone complete - ${downloadedCount}/${totalResources} resources downloaded (${successRate}%)`;
+      if (failedCount > 0) {
+        completionMessage += ` - ${failedCount} resources failed but clone completed successfully`;
+        console.warn(`Clone completed with ${failedCount} errors:`, errors.slice(0, 10));
+      }
+
       await storage.updateProjectStatus(projectId, "complete", {
         totalFiles: allFiles.length,
         totalSize,
-        currentStep: "Clone complete",
+        currentStep: completionMessage,
         progressPercentage: 100,
       });
 
-      onProgress?.(100, "Clone complete");
+      onProgress?.(100, completionMessage);
     } catch (error) {
       await storage.updateProjectStatus(projectId, "error", {
         errorMessage: error instanceof Error ? error.message : "Unknown error",
@@ -531,6 +611,165 @@ export class CloneService {
       throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
     }
     return Buffer.from(await response.arrayBuffer());
+  }
+
+  private parseCSSForResources(cssContent: string, cssUrl: string): {
+    imports: string[];
+    urls: string[];
+  } {
+    const imports: string[] = [];
+    const urls: string[] = [];
+
+    const importRegex = /@import\s+(?:url\()?['"]?([^'"\)]+)['"]?\)?[^;]*;/g;
+    let match;
+    while ((match = importRegex.exec(cssContent)) !== null) {
+      imports.push(match[1]);
+    }
+
+    const urlRegex = /url\(['"]?([^'")\s]+)['"]?\)/g;
+    while ((match = urlRegex.exec(cssContent)) !== null) {
+      const urlPath = match[1];
+      // Download all URLs except data URIs (including absolute http/https URLs)
+      if (!urlPath.startsWith('data:')) {
+        urls.push(urlPath);
+      }
+    }
+
+    return { imports, urls };
+  }
+
+  private cssVisited = new Set<string>();
+  private cssUrlToLocalPath = new Map<string, string>();
+
+  private async processCSS(
+    projectId: string,
+    cssContent: string,
+    cssUrl: string,
+    cssLocalPath: string,
+    baseUrl: string,
+    failedCount?: { count: number },
+    errors?: string[]
+  ): Promise<string> {
+    // If already processed, return early (file already saved)
+    if (this.cssVisited.has(cssUrl)) {
+      return "";  // Return empty - caller should not save
+    }
+    
+    // Mark as being processed and store canonical path
+    this.cssVisited.add(cssUrl);
+    this.cssUrlToLocalPath.set(cssUrl, cssLocalPath);
+
+    const { imports, urls } = this.parseCSSForResources(cssContent, cssUrl);
+    let processedCSS = cssContent;
+
+    // Process @import statements
+    for (const importPath of imports) {
+      try {
+        const absoluteUrl = new URL(importPath, cssUrl).href;
+        
+        // Get or create canonical local path for this CSS URL
+        let importLocalPath: string;
+        if (this.cssUrlToLocalPath.has(absoluteUrl)) {
+          // Already processed - reuse existing path
+          importLocalPath = this.cssUrlToLocalPath.get(absoluteUrl)!;
+        } else {
+          // First time seeing this - create canonical path from the import URL itself
+          importLocalPath = fileManager.getLocalPath(importPath, absoluteUrl);
+          this.cssUrlToLocalPath.set(absoluteUrl, importLocalPath);
+        }
+        
+        // If not yet visited, fetch and process it
+        if (!this.cssVisited.has(absoluteUrl)) {
+          const importContent = await this.fetchResource(absoluteUrl);
+          
+          // Recursively process the imported CSS first
+          const recursivelyProcessed = await this.processCSS(
+            projectId,
+            importContent.toString(),
+            absoluteUrl,
+            importLocalPath,
+            baseUrl,
+            failedCount,
+            errors
+          );
+
+          // Only save if recursivelyProcessed is not empty (not already saved)
+          if (recursivelyProcessed) {
+            const fullLocalPath = `css/${importLocalPath}`;
+            await fileManager.saveFile(projectId, fullLocalPath, Buffer.from(recursivelyProcessed));
+            await storage.createFile({
+              projectId,
+              path: fullLocalPath,
+              content: recursivelyProcessed,
+              type: "css",
+              size: recursivelyProcessed.length,
+            });
+          }
+        }
+
+        // Calculate correct relative path from current CSS to imported CSS
+        const cssDepth = cssLocalPath.split('/').length - 1;
+        const relativePrefix = cssDepth > 0 ? '../'.repeat(cssDepth) : './';
+        
+        processedCSS = processedCSS.replace(
+          new RegExp(`@import\\s+(?:url\\()?['"]?${importPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]?\\)?[^;]*;`, 'g'),
+          `@import url('${relativePrefix}${importLocalPath}');`
+        );
+      } catch (error) {
+        if (failedCount) failedCount.count++;
+        const errorMsg = `CSS @import: ${importPath} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+        if (errors) errors.push(errorMsg);
+        console.error(`Failed to download @import: ${importPath}`, error);
+      }
+    }
+
+    // Process url() references
+    for (const urlPath of urls) {
+      try {
+        const absoluteUrl = new URL(urlPath, cssUrl).href;
+        const content = await this.fetchResource(absoluteUrl);
+        const localPath = fileManager.getLocalPath(urlPath, cssUrl);
+        
+        const ext = localPath.split('.').pop()?.toLowerCase();
+        let folder = 'css';
+        let fileType: 'font' | 'image' | 'css' | 'other' = 'other';
+        
+        if (['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(ext || '')) {
+          folder = 'fonts';
+          fileType = 'font';
+        } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext || '')) {
+          folder = 'images';
+          fileType = 'image';
+        }
+
+        const fullLocalPath = `${folder}/${localPath}`;
+        await fileManager.saveFile(projectId, fullLocalPath, content);
+        await storage.createFile({
+          projectId,
+          path: fullLocalPath,
+          content: "",
+          type: fileType,
+          size: content.length,
+        });
+
+        // Calculate correct relative path from CSS file to resource
+        const cssDepth = cssLocalPath.split('/').length - 1;
+        const relativePrefix = cssDepth > 0 ? '../'.repeat(cssDepth + 1) : '../';
+        const relativePath = `${relativePrefix}${folder}/${localPath}`;
+        
+        processedCSS = processedCSS.replace(
+          new RegExp(`url\\(['"]?${urlPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]?\\)`, 'g'),
+          `url('${relativePath}')`
+        );
+      } catch (error) {
+        if (failedCount) failedCount.count++;
+        const errorMsg = `CSS resource: ${urlPath} - ${error instanceof Error ? error.message : 'Unknown error'}`;
+        if (errors) errors.push(errorMsg);
+        console.error(`Failed to download CSS resource: ${urlPath}`, error);
+      }
+    }
+
+    return processedCSS;
   }
 
   async estimateClone(url: string, method: "static" | "playwright" = "static", crawlDepth: number = 0): Promise<{
